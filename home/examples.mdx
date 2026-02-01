@@ -1,0 +1,104 @@
+---
+title: Examples
+description: Ready-to-run examples for scraping, AI integrations, production patterns, and deployment
+---
+
+Explore working examples that cover everything from basic scraping to production deployments. Each example links directly to the source code on GitHub.
+
+<a href="https://github.com/vakra-dev/reader/tree/main/examples" target="_blank">
+  Browse all examples on GitHub →
+</a>
+
+## Basic
+
+Core scraping and crawling patterns to get started.
+
+<CardGroup cols={2}>
+  <Card title="Basic Scrape" icon="code" href="https://github.com/vakra-dev/reader/tree/main/examples/basic/basic-scrape.ts">
+    Scrape a single URL and get markdown, HTML, and metadata
+  </Card>
+  <Card title="Batch Scrape" icon="layer-group" href="https://github.com/vakra-dev/reader/tree/main/examples/basic/batch-scrape.ts">
+    Scrape multiple URLs concurrently with progress tracking
+  </Card>
+  <Card title="Large Batch Scrape" icon="database" href="https://github.com/vakra-dev/reader/tree/main/examples/basic/large-batch-scrape.ts">
+    Handle 1000+ URLs with pool sizing and memory management
+  </Card>
+  <Card title="Browser Pool Config" icon="gears" href="https://github.com/vakra-dev/reader/tree/main/examples/basic/browser-pool-config.ts">
+    Configure pool size, recycling, and queue management
+  </Card>
+  <Card title="Single Proxy" icon="shield" href="https://github.com/vakra-dev/reader/tree/main/examples/basic/with-proxy.ts">
+    Route scraping through a proxy with geo-targeting
+  </Card>
+  <Card title="Proxy Rotation" icon="rotate" href="https://github.com/vakra-dev/reader/tree/main/examples/basic/proxy-pool.ts">
+    Rotate through multiple proxies with round-robin or random strategies
+  </Card>
+  <Card title="Cloudflare Bypass" icon="cloud" href="https://github.com/vakra-dev/reader/tree/main/examples/basic/cloudflare-bypass.ts">
+    Scrape Cloudflare-protected sites with automatic challenge handling
+  </Card>
+  <Card title="Crawl Website" icon="spider" href="https://github.com/vakra-dev/reader/tree/main/examples/basic/crawl-website.ts">
+    Crawl a site with depth control and optional content scraping
+  </Card>
+  <Card title="All Formats" icon="file-lines" href="https://github.com/vakra-dev/reader/tree/main/examples/basic/all-formats.ts">
+    Output content in both markdown and HTML formats
+  </Card>
+</CardGroup>
+
+## AI Tools
+
+Integrate Reader with LLMs, RAG frameworks, and vector stores.
+
+<CardGroup cols={2}>
+  <Card title="OpenAI Summary" icon="wand-magic-sparkles" href="https://github.com/vakra-dev/reader/tree/main/examples/ai-tools/openai-summary.ts">
+    Scrape pages and summarize with GPT, with token tracking
+  </Card>
+  <Card title="Anthropic Summary" icon="wand-magic-sparkles" href="https://github.com/vakra-dev/reader/tree/main/examples/ai-tools/anthropic-summary.ts">
+    Scrape pages and summarize with Claude, with token tracking
+  </Card>
+  <Card title="Vercel AI Streaming" icon="bolt" href="https://github.com/vakra-dev/reader/tree/main/examples/ai-tools/vercel-ai-stream.ts">
+    Stream summaries in real-time using the Vercel AI SDK
+  </Card>
+  <Card title="LangChain Loader" icon="link" href="https://github.com/vakra-dev/reader/tree/main/examples/ai-tools/langchain-loader.ts">
+    Custom LangChain document loader for scraping and crawling
+  </Card>
+  <Card title="LlamaIndex Loader" icon="link" href="https://github.com/vakra-dev/reader/tree/main/examples/ai-tools/llamaindex-loader.ts">
+    Custom LlamaIndex document loader for RAG pipelines
+  </Card>
+  <Card title="Pinecone Ingest" icon="magnifying-glass" href="https://github.com/vakra-dev/reader/tree/main/examples/ai-tools/pinecone-ingest.ts">
+    Scrape, embed with OpenAI, and ingest into Pinecone
+  </Card>
+  <Card title="Qdrant Ingest" icon="magnifying-glass" href="https://github.com/vakra-dev/reader/tree/main/examples/ai-tools/qdrant-ingest.ts">
+    Scrape, embed with OpenAI, and ingest into Qdrant
+  </Card>
+</CardGroup>
+
+## Production
+
+Patterns for running Reader in production environments.
+
+<CardGroup cols={2}>
+  <Card title="Express Server" icon="server" href="https://github.com/vakra-dev/reader/tree/main/examples/production/express-server">
+    REST API with health checks, scrape/crawl endpoints, and graceful shutdown
+  </Card>
+  <Card title="Browser Pool Scaling" icon="chart-line" href="https://github.com/vakra-dev/reader/tree/main/examples/production/browser-pool-scaling">
+    Advanced pool management with metrics, auto-recovery, and graceful degradation
+  </Card>
+  <Card title="Job Queue (BullMQ)" icon="list-check" href="https://github.com/vakra-dev/reader/tree/main/examples/production/job-queue-bullmq">
+    Async job queue with Redis, webhooks, retries, and horizontal scaling
+  </Card>
+</CardGroup>
+
+## Deployment
+
+Deploy Reader to various platforms.
+
+<CardGroup cols={2}>
+  <Card title="Docker" icon="docker" href="https://github.com/vakra-dev/reader/tree/main/examples/deployment/docker">
+    Docker and docker-compose with health checks and graceful shutdown
+  </Card>
+  <Card title="AWS Lambda" icon="aws" href="https://github.com/vakra-dev/reader/tree/main/examples/deployment/aws-lambda">
+    Serverless deployment with container images and API Gateway
+  </Card>
+  <Card title="Vercel Functions" icon="globe" href="https://github.com/vakra-dev/reader/tree/main/examples/deployment/vercel-functions">
+    Serverless functions with remote browser service recommendations
+  </Card>
+</CardGroup>

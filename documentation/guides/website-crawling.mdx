@@ -1,0 +1,264 @@
+---
+title: Website Crawling
+description: Discover and scrape pages across a website
+---
+
+This guide covers how to crawl websites to discover pages and optionally scrape their content.
+
+## Basic Crawl
+
+```typescript
+import { ReaderClient } from "@vakra-dev/reader";
+
+const reader = new ReaderClient();
+
+const result = await reader.crawl({
+  url: "https://example.com",
+  depth: 2,
+  maxPages: 50,
+});
+
+console.log(`Found ${result.urls.length} pages`);
+result.urls.forEach((page) => {
+  console.log(`- ${page.title}: ${page.url}`);
+});
+
+await reader.close();
+```
+
+## Crawl with Scraping
+
+To also scrape the content of discovered pages:
+
+```typescript
+const result = await reader.crawl({
+  url: "https://example.com",
+  depth: 2,
+  maxPages: 50,
+  scrape: true, // Enable scraping
+});
+
+console.log(`Discovered ${result.urls.length} URLs`);
+console.log(`Scraped ${result.scraped?.batchMetadata.successfulUrls} pages`);
+
+// Access scraped content
+result.scraped?.data.forEach((page) => {
+  console.log(`Title: ${page.metadata.website.title}`);
+  console.log(`Content: ${page.markdown?.substring(0, 200)}...`);
+});
+```
+
+## Control Crawl Depth
+
+```typescript
+// Depth 1: Only pages directly linked from seed URL
+const shallow = await reader.crawl({
+  url: "https://example.com",
+  depth: 1,
+});
+
+// Depth 3: Go three levels deep
+const deep = await reader.crawl({
+  url: "https://example.com",
+  depth: 3,
+  maxPages: 200,
+});
+```
+
+## Limit Pages
+
+```typescript
+const result = await reader.crawl({
+  url: "https://example.com",
+  depth: 5,
+  maxPages: 100, // Stop after finding 100 pages
+});
+```
+
+## Filter URLs with Patterns
+
+Use regex patterns to include or exclude URLs:
+
+```typescript
+// Only crawl blog posts
+const result = await reader.crawl({
+  url: "https://example.com",
+  depth: 3,
+  includePatterns: ["^/blog/"],
+});
+
+// Exclude admin and API routes
+const result = await reader.crawl({
+  url: "https://example.com",
+  depth: 3,
+  excludePatterns: ["^/admin/", "^/api/", "^/auth/"],
+});
+
+// Combine both
+const result = await reader.crawl({
+  url: "https://example.com",
+  depth: 3,
+  includePatterns: ["^/docs/", "^/guides/"],
+  excludePatterns: ["^/docs/legacy/"],
+});
+```
+
+## Rate Limiting
+
+Control the delay between requests:
+
+```typescript
+const result = await reader.crawl({
+  url: "https://example.com",
+  depth: 2,
+  delayMs: 2000, // 2 seconds between requests
+});
+```
+
+## Crawl Timeout
+
+Set a timeout for the entire crawl operation:
+
+```typescript
+const result = await reader.crawl({
+  url: "https://example.com",
+  depth: 3,
+  maxPages: 100,
+  timeoutMs: 300000, // 5 minutes max
+});
+```
+
+## Concurrent Scraping
+
+When scraping discovered pages, control concurrency:
+
+```typescript
+const result = await reader.crawl({
+  url: "https://example.com",
+  depth: 2,
+  maxPages: 50,
+  scrape: true,
+  scrapeConcurrency: 5, // Scrape 5 pages at a time
+  formats: ["markdown"],
+});
+```
+
+## With Proxy
+
+```typescript
+const result = await reader.crawl({
+  url: "https://example.com",
+  depth: 2,
+  proxy: {
+    host: "proxy.example.com",
+    port: 8080,
+    username: "user",
+    password: "pass",
+  },
+});
+```
+
+## Crawl Result Structure
+
+```typescript
+interface CrawlResult {
+  urls: CrawlUrl[];
+  scraped?: ScrapeResult; // Only if scrape: true
+  metadata: CrawlMetadata;
+}
+
+interface CrawlUrl {
+  url: string;
+  title: string;
+  description: string | null;
+}
+
+interface CrawlMetadata {
+  totalUrls: number;
+  maxDepth: number;
+  totalDuration: number;
+  seedUrl: string;
+}
+```
+
+## Complete Example: Crawl Documentation Site
+
+```typescript
+import { ReaderClient } from "@vakra-dev/reader";
+import * as fs from "fs";
+
+async function crawlDocs(baseUrl: string) {
+  const reader = new ReaderClient({ verbose: true });
+
+  try {
+    console.log(`Crawling ${baseUrl}...`);
+
+    const result = await reader.crawl({
+      url: baseUrl,
+      depth: 3,
+      maxPages: 100,
+      scrape: true,
+      scrapeConcurrency: 3,
+      delayMs: 1000,
+      includePatterns: ["^/docs/", "^/guides/", "^/api/"],
+      excludePatterns: ["^/docs/v1/"], // Exclude old versions
+      formats: ["markdown"],
+    });
+
+    console.log(`\n--- Crawl Complete ---`);
+    console.log(`Pages found: ${result.urls.length}`);
+    console.log(`Pages scraped: ${result.scraped?.batchMetadata.successfulUrls}`);
+    console.log(`Duration: ${result.metadata.totalDuration}ms`);
+
+    // Save results
+    const output = {
+      crawledAt: new Date().toISOString(),
+      baseUrl,
+      pages: result.scraped?.data.map((page) => ({
+        url: page.metadata.baseUrl,
+        title: page.metadata.website.title,
+        content: page.markdown,
+      })),
+    };
+
+    fs.writeFileSync("docs-crawl.json", JSON.stringify(output, null, 2));
+    console.log("Saved to docs-crawl.json");
+
+    return result;
+  } finally {
+    await reader.close();
+  }
+}
+
+crawlDocs("https://docs.example.com").catch(console.error);
+```
+
+## CLI Usage
+
+```bash
+# Basic crawl
+npx reader crawl https://example.com
+
+# Crawl deeper with more pages
+npx reader crawl https://example.com -d 3 -m 100
+
+# Crawl and scrape content
+npx reader crawl https://example.com -d 2 --scrape
+
+# Filter URLs
+npx reader crawl https://example.com --include "blog/*" --exclude "admin/*"
+
+# Save to file
+npx reader crawl https://example.com -d 2 --scrape -o crawl-results.json
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Batch Scraping" icon="layer-group" href="/documentation/guides/batch-scraping">
+    High-volume scraping techniques
+  </Card>
+  <Card title="Proxy Configuration" icon="shield" href="/documentation/guides/proxy-configuration">
+    Use proxies for crawling
+  </Card>
+</CardGroup>

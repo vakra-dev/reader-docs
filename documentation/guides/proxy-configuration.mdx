@@ -1,0 +1,270 @@
+---
+title: Proxy Configuration
+description: Set up proxies and rotation strategies
+---
+
+This guide covers how to configure proxies for scraping, including single proxies and rotation strategies.
+
+## Single Proxy
+
+Use a single proxy for all requests:
+
+```typescript
+import { ReaderClient } from "@vakra-dev/reader";
+
+const reader = new ReaderClient();
+
+const result = await reader.scrape({
+  urls: ["https://example.com"],
+  proxy: {
+    host: "proxy.example.com",
+    port: 8080,
+    username: "user",
+    password: "pass",
+  },
+});
+
+await reader.close();
+```
+
+## Proxy URL Format
+
+You can also provide a full proxy URL:
+
+```typescript
+const result = await reader.scrape({
+  urls: ["https://example.com"],
+  proxy: {
+    url: "http://user:pass@proxy.example.com:8080",
+  },
+});
+```
+
+## Proxy Types
+
+Specify the proxy type for optimized handling:
+
+```typescript
+// Datacenter proxy
+const result = await reader.scrape({
+  urls: ["https://example.com"],
+  proxy: {
+    type: "datacenter",
+    host: "dc-proxy.example.com",
+    port: 8080,
+    username: "user",
+    password: "pass",
+  },
+});
+
+// Residential proxy
+const result = await reader.scrape({
+  urls: ["https://example.com"],
+  proxy: {
+    type: "residential",
+    host: "res-proxy.example.com",
+    port: 8080,
+    username: "user",
+    password: "pass",
+    country: "us", // Geo-targeting
+  },
+});
+```
+
+## Proxy Rotation
+
+Configure multiple proxies with automatic rotation:
+
+```typescript
+const reader = new ReaderClient({
+  proxies: [
+    { host: "proxy1.example.com", port: 8080, username: "user", password: "pass" },
+    { host: "proxy2.example.com", port: 8080, username: "user", password: "pass" },
+    { host: "proxy3.example.com", port: 8080, username: "user", password: "pass" },
+  ],
+  proxyRotation: "round-robin", // or "random"
+});
+
+// Each scrape call uses the next proxy in rotation
+await reader.scrape({ urls: ["https://example1.com"] }); // Uses proxy1
+await reader.scrape({ urls: ["https://example2.com"] }); // Uses proxy2
+await reader.scrape({ urls: ["https://example3.com"] }); // Uses proxy3
+await reader.scrape({ urls: ["https://example4.com"] }); // Uses proxy1 again
+
+await reader.close();
+```
+
+## Rotation Strategies
+
+### Round-Robin (Default)
+
+Cycles through proxies in order:
+
+```typescript
+const reader = new ReaderClient({
+  proxies: [proxy1, proxy2, proxy3],
+  proxyRotation: "round-robin",
+});
+// Request 1 → proxy1
+// Request 2 → proxy2
+// Request 3 → proxy3
+// Request 4 → proxy1 (cycles back)
+```
+
+### Random
+
+Selects a random proxy for each request:
+
+```typescript
+const reader = new ReaderClient({
+  proxies: [proxy1, proxy2, proxy3],
+  proxyRotation: "random",
+});
+// Each request uses a randomly selected proxy
+```
+
+## Sticky Sessions for Crawling
+
+When crawling, a single proxy is used for the entire crawl session to maintain session consistency:
+
+```typescript
+const reader = new ReaderClient({
+  proxies: [proxy1, proxy2, proxy3],
+  proxyRotation: "round-robin",
+});
+
+// Crawl uses one proxy for all requests in the session
+const result = await reader.crawl({
+  url: "https://example.com",
+  depth: 2,
+  maxPages: 50,
+});
+// All 50 pages use the same proxy
+```
+
+## Override Per-Request
+
+Override the configured proxies for specific requests:
+
+```typescript
+const reader = new ReaderClient({
+  proxies: [defaultProxy1, defaultProxy2],
+});
+
+// Use default rotation
+await reader.scrape({ urls: ["https://example.com"] });
+
+// Override with specific proxy
+await reader.scrape({
+  urls: ["https://special-site.com"],
+  proxy: {
+    host: "special-proxy.example.com",
+    port: 8080,
+    username: "user",
+    password: "pass",
+  },
+});
+```
+
+## Proxy Result Metadata
+
+Check which proxy was used for each request:
+
+```typescript
+const result = await reader.scrape({
+  urls: ["https://example.com"],
+  proxy: { host: "proxy.example.com", port: 8080 },
+});
+
+// Proxy info in metadata
+const proxyUsed = result.data[0].metadata.proxy;
+if (proxyUsed) {
+  console.log(`Used proxy: ${proxyUsed.host}:${proxyUsed.port}`);
+}
+```
+
+## CLI Usage
+
+```bash
+# Single proxy
+npx reader scrape https://example.com --proxy http://user:pass@proxy.example.com:8080
+
+# Crawl with proxy
+npx reader crawl https://example.com --proxy http://user:pass@proxy.example.com:8080
+```
+
+## Complete Example
+
+```typescript
+import { ReaderClient, ProxyConfig } from "@vakra-dev/reader";
+
+async function scrapeWithProxies() {
+  const proxies: ProxyConfig[] = [
+    {
+      type: "residential",
+      host: "us-proxy.example.com",
+      port: 8080,
+      username: "user",
+      password: "pass",
+      country: "us",
+    },
+    {
+      type: "residential",
+      host: "uk-proxy.example.com",
+      port: 8080,
+      username: "user",
+      password: "pass",
+      country: "uk",
+    },
+    {
+      type: "residential",
+      host: "de-proxy.example.com",
+      port: 8080,
+      username: "user",
+      password: "pass",
+      country: "de",
+    },
+  ];
+
+  const reader = new ReaderClient({
+    proxies,
+    proxyRotation: "round-robin",
+    browserPool: { size: 5 },
+  });
+
+  try {
+    const urls = [
+      "https://example.com/page1",
+      "https://example.com/page2",
+      "https://example.com/page3",
+      "https://example.com/page4",
+      "https://example.com/page5",
+    ];
+
+    const result = await reader.scrape({
+      urls,
+      batchConcurrency: 3,
+      onProgress: (p) => {
+        console.log(`[${p.completed}/${p.total}] ${p.currentUrl}`);
+      },
+    });
+
+    console.log(`Scraped ${result.batchMetadata.successfulUrls} URLs`);
+  } finally {
+    await reader.close();
+  }
+}
+
+scrapeWithProxies().catch(console.error);
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Batch Scraping" icon="layer-group" href="/documentation/guides/batch-scraping">
+    High-volume scraping
+  </Card>
+  <Card title="Deployment" icon="server" href="/documentation/guides/deployment">
+    Deploy Reader in production
+  </Card>
+</CardGroup>

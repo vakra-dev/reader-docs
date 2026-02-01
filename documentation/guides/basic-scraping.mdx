@@ -1,0 +1,198 @@
+---
+title: Basic Scraping
+description: Learn how to scrape URLs with Reader
+---
+
+This guide covers the fundamentals of scraping web pages with Reader.
+
+## Setup
+
+First, install Reader:
+
+```bash
+npm install @vakra-dev/reader
+```
+
+## Scrape a Single URL
+
+```typescript
+import { ReaderClient } from "@vakra-dev/reader";
+
+const reader = new ReaderClient();
+
+const result = await reader.scrape({
+  urls: ["https://example.com"],
+});
+
+console.log(result.data[0].markdown);
+
+await reader.close();
+```
+
+## Scrape Multiple URLs
+
+```typescript
+const result = await reader.scrape({
+  urls: [
+    "https://example.com/page1",
+    "https://example.com/page2",
+    "https://example.com/page3",
+  ],
+});
+
+result.data.forEach((page) => {
+  console.log(`URL: ${page.metadata.baseUrl}`);
+  console.log(`Content: ${page.markdown?.substring(0, 100)}...`);
+});
+```
+
+## Get Multiple Formats
+
+```typescript
+const result = await reader.scrape({
+  urls: ["https://example.com"],
+  formats: ["markdown", "html"],
+});
+
+console.log("Markdown:", result.data[0].markdown);
+console.log("HTML:", result.data[0].html);
+```
+
+## Access Metadata
+
+```typescript
+const result = await reader.scrape({
+  urls: ["https://example.com"],
+});
+
+const metadata = result.data[0].metadata;
+
+console.log("Title:", metadata.website.title);
+console.log("Description:", metadata.website.description);
+console.log("Duration:", metadata.duration, "ms");
+console.log("Scraped at:", metadata.scrapedAt);
+
+// Open Graph
+if (metadata.website.openGraph) {
+  console.log("OG Image:", metadata.website.openGraph.image);
+}
+```
+
+## Handle Errors
+
+```typescript
+const result = await reader.scrape({
+  urls: [
+    "https://example.com",
+    "https://invalid-url.example",
+  ],
+});
+
+// Check batch metadata for errors
+console.log("Successful:", result.batchMetadata.successfulUrls);
+console.log("Failed:", result.batchMetadata.failedUrls);
+
+if (result.batchMetadata.errors) {
+  result.batchMetadata.errors.forEach((error) => {
+    console.log(`Error for ${error.url}: ${error.error}`);
+  });
+}
+```
+
+## Track Progress
+
+```typescript
+const result = await reader.scrape({
+  urls: ["https://example.com", "https://example.org"],
+  onProgress: (progress) => {
+    console.log(`${progress.completed}/${progress.total}: ${progress.currentUrl}`);
+  },
+});
+```
+
+## Set Timeouts
+
+```typescript
+const result = await reader.scrape({
+  urls: ["https://example.com"],
+  timeoutMs: 60000, // 60 seconds per page
+});
+```
+
+## Wait for Specific Elements
+
+```typescript
+const result = await reader.scrape({
+  urls: ["https://example.com"],
+  waitForSelector: ".article-content",
+});
+```
+
+## Verbose Logging
+
+```typescript
+const reader = new ReaderClient({ verbose: true });
+
+const result = await reader.scrape({
+  urls: ["https://example.com"],
+});
+```
+
+## Show Browser (Debugging)
+
+```typescript
+const reader = new ReaderClient({ showChrome: true });
+
+const result = await reader.scrape({
+  urls: ["https://example.com"],
+});
+```
+
+## Complete Example
+
+```typescript
+import { ReaderClient } from "@vakra-dev/reader";
+
+async function main() {
+  const reader = new ReaderClient({ verbose: true });
+
+  try {
+    const result = await reader.scrape({
+      urls: [
+        "https://news.ycombinator.com",
+        "https://lobste.rs",
+      ],
+      formats: ["markdown"],
+      timeoutMs: 30000,
+      onProgress: (p) => {
+        console.log(`[${p.completed}/${p.total}] ${p.currentUrl}`);
+      },
+    });
+
+    console.log("\n--- Results ---");
+    console.log(`Successful: ${result.batchMetadata.successfulUrls}`);
+    console.log(`Failed: ${result.batchMetadata.failedUrls}`);
+    console.log(`Duration: ${result.batchMetadata.totalDuration}ms`);
+
+    result.data.forEach((page, i) => {
+      console.log(`\n[${i + 1}] ${page.metadata.website.title}`);
+      console.log(page.markdown?.substring(0, 200) + "...");
+    });
+  } finally {
+    await reader.close();
+  }
+}
+
+main().catch(console.error);
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Batch Scraping" icon="layer-group" href="/documentation/guides/batch-scraping">
+    High-volume concurrent scraping
+  </Card>
+  <Card title="Content Extraction" icon="wand-magic-sparkles" href="/documentation/concepts/content-extraction">
+    Control what content is extracted
+  </Card>
+</CardGroup>

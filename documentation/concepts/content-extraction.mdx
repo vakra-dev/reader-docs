@@ -1,0 +1,161 @@
+---
+title: Content Extraction
+description: How Reader extracts main content from web pages
+---
+
+Reader automatically extracts the main content from web pages, removing navigation, headers, footers, ads, and other non-content elements.
+
+## How It Works
+
+By default (`onlyMainContent: true`), Reader uses a multi-step algorithm:
+
+### 1. Find Main Content Container
+
+Reader looks for main content in this order:
+
+1. `<main>` element
+2. `[role="main"]` attribute
+3. Single `<article>` element
+4. Common content IDs/classes (`#content`, `.post-content`, etc.)
+5. Largest text block (fallback heuristic)
+
+### 2. Remove Navigation Chrome
+
+If no main content container is found, Reader removes:
+
+- `<nav>`, `<header>`, `<footer>`, `<aside>`
+- Sidebars, menus, breadcrumbs
+- Social sharing, comments sections
+- Newsletter forms, cookie banners
+
+### 3. Always Remove
+
+Regardless of mode, Reader always removes:
+
+- Scripts, styles, noscript, templates
+- Hidden elements
+- Overlays, modals, popups
+- Cookie consent banners
+- Fixed/sticky positioned elements
+- Ads and tracking pixels
+
+## Controlling Extraction
+
+### Disable Main Content Extraction
+
+For full-page capture (includes nav, header, footer):
+
+```typescript
+const result = await reader.scrape({
+  urls: ["https://example.com"],
+  onlyMainContent: false,
+});
+```
+
+### Include Specific Elements
+
+Keep only specific elements using CSS selectors:
+
+```typescript
+const result = await reader.scrape({
+  urls: ["https://example.com"],
+  includeTags: [".article-content", "#main"],
+});
+```
+
+### Exclude Specific Elements
+
+Remove specific elements:
+
+```typescript
+const result = await reader.scrape({
+  urls: ["https://example.com"],
+  excludeTags: [".comments", ".related-posts", ".sidebar"],
+});
+```
+
+### Combine Include and Exclude
+
+```typescript
+const result = await reader.scrape({
+  urls: ["https://example.com"],
+  includeTags: [".article"],
+  excludeTags: [".article-comments", ".article-share"],
+});
+```
+
+## CLI Options
+
+```bash
+# Disable main content extraction
+npx reader scrape https://example.com --no-main-content
+
+# Include specific elements
+npx reader scrape https://example.com --include-tags ".article,.content"
+
+# Exclude specific elements
+npx reader scrape https://example.com --exclude-tags ".comments,.sidebar"
+```
+
+## HTML to Markdown
+
+Reader uses [supermarkdown](https://github.com/vakra-dev/supermarkdown) for HTML to Markdown conversion, a high-performance Rust library with full GFM support.
+
+### Supported Elements
+
+| Element | Markdown Output |
+|---------|-----------------|
+| Headings | `# H1`, `## H2`, etc. |
+| Paragraphs | Plain text with blank lines |
+| Lists | `-` or `1.` |
+| Links | `[text](url)` |
+| Images | `![alt](src)` |
+| Code | `` `inline` `` or fenced blocks |
+| Tables | GFM table syntax |
+| Blockquotes | `> quoted text` |
+
+## Examples
+
+### Blog Post
+
+```typescript
+// Extract just the article content
+const result = await reader.scrape({
+  urls: ["https://blog.example.com/post"],
+  includeTags: ["article", ".post-content"],
+  excludeTags: [".author-bio", ".related-posts"],
+});
+```
+
+### Documentation
+
+```typescript
+// Keep sidebar for navigation context
+const result = await reader.scrape({
+  urls: ["https://docs.example.com/guide"],
+  onlyMainContent: false,
+  excludeTags: ["nav", "footer", ".announcement-banner"],
+});
+```
+
+### E-commerce Product
+
+```typescript
+// Extract product details only
+const result = await reader.scrape({
+  urls: ["https://shop.example.com/product"],
+  includeTags: [".product-details", ".product-description"],
+  excludeTags: [".reviews", ".recommendations"],
+});
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Basic Scraping" icon="code" href="/documentation/guides/basic-scraping">
+    Learn scraping fundamentals
+  </Card>
+  <Card title="ScrapeOptions" icon="sliders" href="/api-reference/scrape-options">
+    Full options reference
+  </Card>
+</CardGroup>

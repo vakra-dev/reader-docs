@@ -1,0 +1,109 @@
+{
+  "$schema": "https://mintlify.com/schema.json",
+  "name": "Reader",
+  "logo": {
+    "dark": "/images/logo-dark.png",
+    "light": "/images/logo-light.png",
+    "height": 120
+  },
+  "favicon": "/images/favicon.ico",
+  "colors": {
+    "primary": "#0D9373",
+    "light": "#07C983",
+    "dark": "#0D9373",
+    "anchors": {
+      "from": "#0D9373",
+      "to": "#07C983"
+    }
+  },
+  "topbarLinks": [
+    {
+      "name": "GitHub",
+      "url": "https://github.com/vakra-dev/reader"
+    }
+  ],
+  "topbarCtaButton": {
+    "name": "Get Started",
+    "url": "https://reader.dev"
+  },
+  "tabs": [
+    {
+      "name": "Home",
+      "url": "home"
+    },
+    {
+      "name": "Documentation",
+      "url": "documentation"
+    },
+    {
+      "name": "API Reference",
+      "url": "api-reference"
+    }
+  ],
+  "anchors": [
+    {
+      "name": "GitHub",
+      "icon": "github",
+      "url": "https://github.com/vakra-dev/reader"
+    },
+    {
+      "name": "npm",
+      "icon": "npm",
+      "url": "https://www.npmjs.com/package/@vakra-dev/reader"
+    }
+  ],
+  "navigation": [
+    {
+      "group": "Home",
+      "pages": ["home/introduction", "home/quickstart", "home/examples"]
+    },
+    {
+      "group": "Documentation",
+      "pages": ["documentation/overview"]
+    },
+    {
+      "group": "Concepts",
+      "pages": [
+        "documentation/concepts/scraping",
+        "documentation/concepts/crawling",
+        "documentation/concepts/content-extraction",
+        "documentation/concepts/browser-pool"
+      ]
+    },
+    {
+      "group": "Guides",
+      "pages": [
+        "documentation/guides/basic-scraping",
+        "documentation/guides/batch-scraping",
+        "documentation/guides/website-crawling",
+        "documentation/guides/proxy-configuration",
+        "documentation/guides/cli-usage",
+        "documentation/guides/deployment"
+      ]
+    },
+    {
+      "group": "API Reference",
+      "pages": ["api-reference/overview"]
+    },
+    {
+      "group": "Classes",
+      "pages": ["api-reference/reader-client"]
+    },
+    {
+      "group": "Functions",
+      "pages": ["api-reference/scrape", "api-reference/crawl"]
+    },
+    {
+      "group": "Types",
+      "pages": [
+        "api-reference/scrape-options",
+        "api-reference/scrape-result",
+        "api-reference/crawl-options",
+        "api-reference/crawl-result"
+      ]
+    }
+  ],
+  "footerSocials": {
+    "github": "https://github.com/vakra-dev/reader"
+  }
+}

@@ -1,0 +1,146 @@
+---
+title: scrape()
+description: Scrape one or more URLs
+---
+
+## Usage
+
+```typescript
+// Via ReaderClient (recommended)
+const reader = new ReaderClient();
+const result = await reader.scrape(options);
+
+// Standalone function
+import { scrape } from "@vakra-dev/reader";
+const result = await scrape(options);
+```
+
+## Parameters
+
+```typescript
+scrape(options: ScrapeOptions): Promise<ScrapeResult>
+```
+
+See [ScrapeOptions](/api-reference/scrape-options) for full options reference.
+
+## Quick Example
+
+```typescript
+import { ReaderClient } from "@vakra-dev/reader";
+
+const reader = new ReaderClient();
+
+const result = await reader.scrape({
+  urls: ["https://example.com"],
+  formats: ["markdown", "html"],
+});
+
+console.log(result.data[0].markdown);
+console.log(result.data[0].metadata.website.title);
+
+await reader.close();
+```
+
+## Return Value
+
+Returns a `Promise<ScrapeResult>`:
+
+```typescript
+interface ScrapeResult {
+  data: WebsiteScrapeResult[];
+  batchMetadata: BatchMetadata;
+}
+```
+
+See [ScrapeResult](/api-reference/scrape-result) for full result structure.
+
+## Common Options
+
+### URLs and Formats
+
+```typescript
+const result = await reader.scrape({
+  urls: ["https://example.com", "https://example.org"],
+  formats: ["markdown", "html"],
+});
+```
+
+### Concurrency
+
+```typescript
+const result = await reader.scrape({
+  urls: manyUrls,
+  batchConcurrency: 5,
+  onProgress: (p) => console.log(`${p.completed}/${p.total}`),
+});
+```
+
+### Content Extraction
+
+```typescript
+const result = await reader.scrape({
+  urls: ["https://example.com"],
+  onlyMainContent: true, // Default
+  includeTags: [".article-content"],
+  excludeTags: [".comments", ".sidebar"],
+});
+```
+
+### Timeouts
+
+```typescript
+const result = await reader.scrape({
+  urls: manyUrls,
+  timeoutMs: 60000, // Per page
+  batchTimeoutMs: 300000, // Total batch
+});
+```
+
+### With Proxy
+
+```typescript
+const result = await reader.scrape({
+  urls: ["https://example.com"],
+  proxy: {
+    host: "proxy.example.com",
+    port: 8080,
+    username: "user",
+    password: "pass",
+  },
+});
+```
+
+## Error Handling
+
+```typescript
+import { ReaderClient, TimeoutError, NetworkError } from "@vakra-dev/reader";
+
+try {
+  const result = await reader.scrape({ urls: ["https://example.com"] });
+} catch (error) {
+  if (error instanceof TimeoutError) {
+    console.log("Request timed out");
+  } else if (error instanceof NetworkError) {
+    console.log("Network error:", error.message);
+  }
+}
+```
+
+## Batch Errors
+
+For batch operations, individual URL failures are captured in the result:
+
+```typescript
+const result = await reader.scrape({
+  urls: ["https://valid.com", "https://invalid-url.example"],
+});
+
+console.log("Successful:", result.batchMetadata.successfulUrls);
+console.log("Failed:", result.batchMetadata.failedUrls);
+
+if (result.batchMetadata.errors) {
+  result.batchMetadata.errors.forEach((e) => {
+    console.log(`${e.url}: ${e.error}`);
+  });
+}
+```

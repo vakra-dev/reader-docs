@@ -1,0 +1,241 @@
+---
+title: Deployment
+description: Deploy Reader in production environments
+---
+
+This guide covers how to deploy Reader in production environments.
+
+## Server Usage Pattern
+
+For server applications, create one `ReaderClient` instance and reuse it:
+
+```typescript
+import { ReaderClient } from "@vakra-dev/reader";
+import express from "express";
+
+// Create client once at startup
+const reader = new ReaderClient({
+  browserPool: {
+    size: 5,
+    retireAfterPages: 50,
+    retireAfterMinutes: 15,
+  },
+});
+
+const app = express();
+app.use(express.json());
+
+// Reuse client for all requests
+app.post("/scrape", async (req, res) => {
+  try {
+    const result = await reader.scrape({
+      urls: req.body.urls,
+      formats: ["markdown"],
+    });
+    res.json(result);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Graceful shutdown
+process.on("SIGTERM", async () => {
+  console.log("Shutting down...");
+  await reader.close();
+  process.exit(0);
+});
+
+app.listen(3000, () => {
+  console.log("Server running on port 3000");
+});
+```
+
+## Docker Deployment
+
+<Warning>
+Docker deployment only works on **x86_64 Linux**. Apple Silicon Macs require native Node.js or a remote x86_64 server.
+</Warning>
+
+### Dockerfile
+
+```dockerfile
+FROM node:20-slim
+
+# Install Chrome dependencies
+RUN apt-get update && apt-get install -y \
+    chromium \
+    fonts-liberation \
+    libasound2 \
+    libatk-bridge2.0-0 \
+    libatk1.0-0 \
+    libcups2 \
+    libdbus-1-3 \
+    libdrm2 \
+    libgbm1 \
+    libgtk-3-0 \
+    libnspr4 \
+    libnss3 \
+    libxcomposite1 \
+    libxdamage1 \
+    libxfixes3 \
+    libxrandr2 \
+    xdg-utils \
+    --no-install-recommends \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+COPY package*.json ./
+RUN npm ci --only=production
+
+COPY . .
+
+ENV NODE_ENV=production
+ENV CHROME_PATH=/usr/bin/chromium
+
+EXPOSE 3000
+
+CMD ["node", "server.js"]
+```
+
+### docker-compose.yml
+
+```yaml
+version: "3.8"
+
+services:
+  reader:
+    build: .
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+    deploy:
+      resources:
+        limits:
+          memory: 4G
+        reservations:
+          memory: 2G
+    restart: unless-stopped
+```
+
+## Production Best Practices
+
+### Browser Pool Configuration
+
+```typescript
+const reader = new ReaderClient({
+  browserPool: {
+    size: 5,              // Balance concurrency vs memory
+    retireAfterPages: 50, // Prevent memory leaks
+    retireAfterMinutes: 15,
+    maxQueueSize: 100,    // Prevent unbounded queue growth
+  },
+});
+```
+
+### Error Handling
+
+```typescript
+import {
+  ReaderClient,
+  TimeoutError,
+  NetworkError,
+  CloudflareError
+} from "@vakra-dev/reader";
+
+app.post("/scrape", async (req, res) => {
+  try {
+    const result = await reader.scrape({
+      urls: req.body.urls,
+      timeoutMs: 30000,
+    });
+    res.json(result);
+  } catch (error) {
+    if (error instanceof TimeoutError) {
+      res.status(504).json({ error: "Request timed out" });
+    } else if (error instanceof NetworkError) {
+      res.status(502).json({ error: "Network error" });
+    } else if (error instanceof CloudflareError) {
+      res.status(403).json({ error: "Access denied" });
+    } else {
+      res.status(500).json({ error: "Internal error" });
+    }
+  }
+});
+```
+
+### Rate Limiting
+
+```typescript
+import rateLimit from "express-rate-limit";
+
+const limiter = rateLimit({
+  windowMs: 60 * 1000, // 1 minute
+  max: 100, // 100 requests per minute
+});
+
+app.use("/scrape", limiter);
+```
+
+### Health Check
+
+```typescript
+app.get("/health", (req, res) => {
+  const ready = reader.isReady();
+  res.status(ready ? 200 : 503).json({
+    status: ready ? "healthy" : "unhealthy",
+    ready,
+  });
+});
+```
+
+### Graceful Shutdown
+
+```typescript
+let isShuttingDown = false;
+
+const shutdown = async () => {
+  if (isShuttingDown) return;
+  isShuttingDown = true;
+
+  console.log("Shutting down gracefully...");
+
+  // Stop accepting new requests
+  server.close();
+
+  // Close reader
+  await reader.close();
+
+  process.exit(0);
+};
+
+process.on("SIGTERM", shutdown);
+process.on("SIGINT", shutdown);
+```
+
+## Memory Considerations
+
+Each browser instance uses ~200-500MB of memory. Plan accordingly:
+
+| Pool Size | Recommended RAM |
+|-----------|-----------------|
+| 1-2 | 2GB |
+| 3-5 | 4GB |
+| 5-10 | 8GB |
+| 10+ | 16GB+ |
+
+## Process Exit Note
+
+Node.js may not auto-exit after `reader.close()` due to Hero internals. For scripts, add `process.exit(0)` after close. For servers, this is expected behavior since the process stays alive to handle requests.
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Browser Pool" icon="layer-group" href="/documentation/concepts/browser-pool">
+    Configure browser pool
+  </Card>
+  <Card title="API Reference" icon="book" href="/api-reference/overview">
+    Full API documentation
+  </Card>
+</CardGroup>

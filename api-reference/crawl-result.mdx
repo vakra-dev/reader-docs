@@ -1,0 +1,141 @@
+---
+title: CrawlResult
+description: Result structure from the crawl() function
+---
+
+## Type Definition
+
+```typescript
+interface CrawlResult {
+  urls: CrawlUrl[];
+  scraped?: ScrapeResult;
+  metadata: CrawlMetadata;
+}
+```
+
+## CrawlUrl
+
+Information about each discovered URL:
+
+```typescript
+interface CrawlUrl {
+  url: string;
+  title: string;
+  description: string | null;
+}
+```
+
+## CrawlMetadata
+
+Metadata about the crawl operation:
+
+```typescript
+interface CrawlMetadata {
+  totalUrls: number;
+  maxDepth: number;
+  totalDuration: number; // Milliseconds
+  seedUrl: string;
+}
+```
+
+## ScrapeResult
+
+When `scrape: true`, the `scraped` property contains the scraped content:
+
+```typescript
+interface ScrapeResult {
+  data: WebsiteScrapeResult[];
+  batchMetadata: BatchMetadata;
+}
+```
+
+See [ScrapeResult](/api-reference/scrape-result) for full structure.
+
+## Examples
+
+### Access Discovered URLs
+
+```typescript
+const result = await reader.crawl({
+  url: "https://example.com",
+  depth: 2,
+  maxPages: 50,
+});
+
+console.log(`Found ${result.urls.length} pages`);
+
+result.urls.forEach((page) => {
+  console.log(`- ${page.title}`);
+  console.log(`  URL: ${page.url}`);
+  console.log(`  Description: ${page.description}`);
+});
+```
+
+### Access Crawl Metadata
+
+```typescript
+const result = await reader.crawl({
+  url: "https://example.com",
+  depth: 2,
+});
+
+const { metadata } = result;
+
+console.log("Seed URL:", metadata.seedUrl);
+console.log("Total URLs:", metadata.totalUrls);
+console.log("Max Depth:", metadata.maxDepth);
+console.log("Duration:", metadata.totalDuration, "ms");
+```
+
+### Access Scraped Content
+
+```typescript
+const result = await reader.crawl({
+  url: "https://example.com",
+  depth: 2,
+  scrape: true,
+});
+
+if (result.scraped) {
+  console.log(`Scraped ${result.scraped.batchMetadata.successfulUrls} pages`);
+
+  result.scraped.data.forEach((page) => {
+    console.log(`Title: ${page.metadata.website.title}`);
+    console.log(`Content: ${page.markdown?.substring(0, 200)}...`);
+  });
+}
+```
+
+### Full Example
+
+```typescript
+const result = await reader.crawl({
+  url: "https://docs.example.com",
+  depth: 3,
+  maxPages: 100,
+  scrape: true,
+  formats: ["markdown"],
+});
+
+console.log("=== Crawl Summary ===");
+console.log(`Seed URL: ${result.metadata.seedUrl}`);
+console.log(`Pages discovered: ${result.metadata.totalUrls}`);
+console.log(`Duration: ${(result.metadata.totalDuration / 1000).toFixed(1)}s`);
+
+console.log("\n=== Discovered URLs ===");
+result.urls.forEach((page, i) => {
+  console.log(`${i + 1}. ${page.title}`);
+  console.log(`   ${page.url}`);
+});
+
+if (result.scraped) {
+  console.log("\n=== Scraped Content ===");
+  console.log(`Success: ${result.scraped.batchMetadata.successfulUrls}`);
+  console.log(`Failed: ${result.scraped.batchMetadata.failedUrls}`);
+
+  result.scraped.data.forEach((page) => {
+    console.log(`\n--- ${page.metadata.website.title} ---`);
+    console.log(page.markdown?.substring(0, 500));
+  });
+}
+```

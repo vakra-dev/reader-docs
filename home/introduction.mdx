@@ -1,0 +1,94 @@
+---
+title: Introduction
+description: Open-source, production-grade web scraping engine built for LLMs
+---
+
+## The Problem
+
+Building agents that need web access is frustrating. You piece together Puppeteer, add stealth plugins, manage proxies, and it still breaks in production.
+
+Because production-grade web scraping isn't about rendering a page and converting HTML to markdown. It's about everything underneath:
+
+| Layer                    | What it actually takes                                          |
+| ------------------------ | --------------------------------------------------------------- |
+| **Browser architecture** | Managing browser instances at scale, not one-off scripts        |
+| **Anti-bot handling**    | JS challenges, Turnstile, and other protections                 |
+| **TLS fingerprinting**   | Real browsers have fingerprints. Puppeteer doesn't. Sites know. |
+| **Proxy infrastructure** | Datacenter vs residential, rotation strategies, sticky sessions |
+| **Resource management**  | Browser pooling, memory limits, graceful recycling              |
+| **Reliability**          | Rate limiting, retries, timeouts, graceful degradation          |
+
+## The Solution
+
+Two primitives. That's it.
+
+```typescript
+import { ReaderClient } from "@vakra-dev/reader";
+
+const reader = new ReaderClient();
+
+// Scrape URLs → clean markdown
+const result = await reader.scrape({ urls: ["https://example.com"] });
+console.log(result.data[0].markdown);
+
+// Crawl a site → discover + scrape pages
+const pages = await reader.crawl({
+  url: "https://example.com",
+  depth: 2,
+  scrape: true,
+});
+console.log(`Found ${pages.urls.length} pages`);
+```
+
+All the hard stuff (browser pooling, challenge detection, proxy rotation, retries) happens under the hood. You get clean markdown. Your agents get the web.
+
+## Features
+
+<CardGroup cols={2}>
+  <Card title="Production-Grade" icon="bolt">
+    Built on Ulixee Hero with TLS fingerprinting and stealth browsing
+  </Card>
+  <Card title="Clean Output" icon="file-lines">
+    Markdown and HTML with automatic main content extraction
+  </Card>
+  <Card title="Browser Pool" icon="layer-group">
+    Auto-recycling, health monitoring, and queue management
+  </Card>
+  <Card title="Website Crawling" icon="globe">
+    BFS link discovery with depth and page limits
+  </Card>
+  <Card title="Proxy Support" icon="shield">
+    Datacenter and residential proxies with rotation strategies
+  </Card>
+  <Card title="CLI Included" icon="terminal">
+    Use from command line or programmatically in your code
+  </Card>
+</CardGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Quickstart" icon="rocket" href="/home/quickstart">
+    Get up and running in 5 minutes
+  </Card>
+  <Card
+    title="Scraping Guide"
+    icon="code"
+    href="/documentation/guides/basic-scraping"
+  >
+    Learn how to scrape URLs
+  </Card>
+  <Card
+    title="Crawling Guide"
+    icon="spider"
+    href="/documentation/guides/website-crawling"
+  >
+    Learn how to crawl websites
+  </Card>
+  <Card title="Examples" icon="folder-open" href="/home/examples">
+    Ready-to-run examples with AI integrations and deployment guides
+  </Card>
+  <Card title="API Reference" icon="book" href="/api-reference/overview">
+    Full API documentation
+  </Card>
+</CardGroup>

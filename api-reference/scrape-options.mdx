@@ -1,0 +1,160 @@
+---
+title: ScrapeOptions
+description: Options for the scrape() function
+---
+
+## Type Definition
+
+```typescript
+interface ScrapeOptions {
+  // Required
+  urls: string[];
+
+  // Output
+  formats?: Array<"markdown" | "html">;
+
+  // Content extraction
+  onlyMainContent?: boolean;
+  includeTags?: string[];
+  excludeTags?: string[];
+  removeAds?: boolean;
+  removeBase64Images?: boolean;
+
+  // Request configuration
+  userAgent?: string;
+  headers?: Record<string, string>;
+  timeoutMs?: number;
+  waitForSelector?: string;
+  skipTLSVerification?: boolean;
+
+  // URL filtering
+  includePatterns?: string[];
+  excludePatterns?: string[];
+
+  // Batch processing
+  batchConcurrency?: number;
+  batchTimeoutMs?: number;
+  maxRetries?: number;
+  onProgress?: (progress: Progress) => void;
+
+  // Proxy
+  proxy?: ProxyConfig;
+
+  // Debugging
+  verbose?: boolean;
+  showChrome?: boolean;
+}
+```
+
+## Options Reference
+
+### Required Options
+
+| Option | Type       | Description             |
+| ------ | ---------- | ----------------------- |
+| `urls` | `string[]` | Array of URLs to scrape |
+
+### Output Options
+
+| Option    | Type                          | Default        | Description               |
+| --------- | ----------------------------- | -------------- | ------------------------- |
+| `formats` | `Array<"markdown" \| "html">` | `["markdown"]` | Output formats to include |
+
+### Content Extraction Options
+
+| Option               | Type       | Default | Description                                           |
+| -------------------- | ---------- | ------- | ----------------------------------------------------- |
+| `onlyMainContent`    | `boolean`  | `true`  | Extract only main content, removing nav/header/footer |
+| `includeTags`        | `string[]` | `[]`    | CSS selectors for elements to keep                    |
+| `excludeTags`        | `string[]` | `[]`    | CSS selectors for elements to remove                  |
+| `removeAds`          | `boolean`  | `true`  | Remove ad and tracking elements                       |
+| `removeBase64Images` | `boolean`  | `true`  | Remove base64-encoded images                          |
+
+### Request Configuration Options
+
+| Option                | Type                     | Default     | Description                                |
+| --------------------- | ------------------------ | ----------- | ------------------------------------------ |
+| `userAgent`           | `string`                 | `undefined` | Custom user agent string                   |
+| `headers`             | `Record<string, string>` | `undefined` | Custom headers for requests                |
+| `timeoutMs`           | `number`                 | `30000`     | Request timeout per page (ms)              |
+| `waitForSelector`     | `string`                 | `undefined` | CSS selector to wait for before extraction |
+| `skipTLSVerification` | `boolean`                | `true`      | Skip TLS/SSL certificate verification      |
+
+### URL Filtering Options
+
+| Option            | Type       | Default | Description                     |
+| ----------------- | ---------- | ------- | ------------------------------- |
+| `includePatterns` | `string[]` | `[]`    | URL patterns to include (regex) |
+| `excludePatterns` | `string[]` | `[]`    | URL patterns to exclude (regex) |
+
+### Batch Processing Options
+
+| Option             | Type       | Default     | Description                        |
+| ------------------ | ---------- | ----------- | ---------------------------------- |
+| `batchConcurrency` | `number`   | `1`         | URLs to process in parallel        |
+| `batchTimeoutMs`   | `number`   | `300000`    | Timeout for entire batch (ms)      |
+| `maxRetries`       | `number`   | `2`         | Max retry attempts for failed URLs |
+| `onProgress`       | `function` | `undefined` | Progress callback                  |
+
+### Proxy Options
+
+| Option  | Type          | Default     | Description         |
+| ------- | ------------- | ----------- | ------------------- |
+| `proxy` | `ProxyConfig` | `undefined` | Proxy configuration |
+
+### Debugging Options
+
+| Option       | Type      | Default | Description            |
+| ------------ | --------- | ------- | ---------------------- |
+| `verbose`    | `boolean` | `false` | Enable verbose logging |
+| `showChrome` | `boolean` | `false` | Show browser window    |
+
+## ProxyConfig
+
+```typescript
+interface ProxyConfig {
+  url?: string; // Full proxy URL
+  type?: "datacenter" | "residential"; // Proxy type
+  host?: string; // Proxy host
+  port?: number; // Proxy port
+  username?: string; // Username
+  password?: string; // Password
+  country?: string; // Country code (e.g., "us")
+}
+```
+
+## Progress Callback
+
+```typescript
+interface Progress {
+  completed: number; // URLs completed
+  total: number; // Total URLs
+  currentUrl: string; // Current URL being processed
+}
+```
+
+## Examples
+
+### Basic
+
+```typescript
+await reader.scrape({
+  urls: ["https://example.com"],
+});
+```
+
+### Full Options
+
+```typescript
+await reader.scrape({
+  urls: ["https://example.com", "https://example.org"],
+  formats: ["markdown", "html"],
+  onlyMainContent: true,
+  excludeTags: [".comments", ".sidebar"],
+  timeoutMs: 60000,
+  batchConcurrency: 3,
+  maxRetries: 3,
+  onProgress: (p) => console.log(`${p.completed}/${p.total}`),
+  verbose: true,
+});
+```

@@ -1,0 +1,157 @@
+---
+title: Quickstart
+description: Get started with Reader in 5 minutes
+---
+
+## Installation
+
+<CodeGroup>
+```bash npm
+npm install @vakra-dev/reader
+```
+
+```bash yarn
+yarn add @vakra-dev/reader
+```
+
+```bash pnpm
+pnpm add @vakra-dev/reader
+```
+</CodeGroup>
+
+<Note>
+**Requirements:** Node.js 18 or higher
+</Note>
+
+## Basic Usage
+
+### Scrape a URL
+
+```typescript
+import { ReaderClient } from "@vakra-dev/reader";
+
+const reader = new ReaderClient();
+
+const result = await reader.scrape({
+  urls: ["https://example.com"],
+});
+
+console.log(result.data[0].markdown);
+
+await reader.close();
+```
+
+### Scrape Multiple URLs
+
+```typescript
+import { ReaderClient } from "@vakra-dev/reader";
+
+const reader = new ReaderClient();
+
+const result = await reader.scrape({
+  urls: [
+    "https://example.com",
+    "https://example.org",
+    "https://example.net",
+  ],
+  batchConcurrency: 3,
+  onProgress: (progress) => {
+    console.log(`${progress.completed}/${progress.total}: ${progress.currentUrl}`);
+  },
+});
+
+console.log(`Scraped ${result.batchMetadata.successfulUrls} URLs`);
+
+await reader.close();
+```
+
+### Crawl a Website
+
+```typescript
+import { ReaderClient } from "@vakra-dev/reader";
+
+const reader = new ReaderClient();
+
+const result = await reader.crawl({
+  url: "https://example.com",
+  depth: 2,
+  maxPages: 20,
+  scrape: true,
+});
+
+console.log(`Discovered ${result.urls.length} URLs`);
+console.log(`Scraped ${result.scraped?.batchMetadata.successfulUrls} pages`);
+
+await reader.close();
+```
+
+## CLI Usage
+
+Reader includes a CLI for quick scraping from the terminal.
+
+### Scrape a URL
+
+```bash
+npx reader scrape https://example.com
+```
+
+### Crawl a Website
+
+```bash
+npx reader crawl https://example.com -d 2 --scrape
+```
+
+### Daemon Mode
+
+For multiple requests, start a daemon to keep the browser pool warm:
+
+```bash
+# Start daemon
+npx reader start --pool-size 5
+
+# Scrape (auto-connects to daemon)
+npx reader scrape https://example.com
+
+# Stop daemon
+npx reader stop
+```
+
+## Output Format
+
+Reader returns structured results with both content and metadata:
+
+```typescript
+const result = await reader.scrape({
+  urls: ["https://example.com"],
+  formats: ["markdown", "html"],
+});
+
+// Access content
+console.log(result.data[0].markdown);
+console.log(result.data[0].html);
+
+// Access metadata
+console.log(result.data[0].metadata.website.title);
+console.log(result.data[0].metadata.duration);
+
+// Batch metadata
+console.log(result.batchMetadata.successfulUrls);
+console.log(result.batchMetadata.failedUrls);
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Scraping Guide" icon="code" href="/documentation/guides/basic-scraping">
+    Learn scraping in detail
+  </Card>
+  <Card title="Crawling Guide" icon="spider" href="/documentation/guides/website-crawling">
+    Learn website crawling
+  </Card>
+  <Card title="Content Extraction" icon="wand-magic-sparkles" href="/documentation/concepts/content-extraction">
+    Understand content cleaning
+  </Card>
+  <Card title="API Reference" icon="book" href="/api-reference/overview">
+    Full API documentation
+  </Card>
+</CardGroup>

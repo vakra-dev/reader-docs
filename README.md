@@ -9,13 +9,3 @@ Built with [Mintlify](https://mintlify.com).
 ```bash
 npx mintlify dev
 ```
-
-Open [http://localhost:3000](http://localhost:3000).
-
-## Deployment
-
-Push to GitHub and connect to Mintlify Dashboard for automatic deployments.
-
-## License
-
-Apache 2.0

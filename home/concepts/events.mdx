@@ -1,0 +1,87 @@
+---
+title: "Events"
+description: "Server-sent streams for real-time updates on one job or across your whole workspace."
+---
+
+Events are Reader's push channel for clients that are online when things happen. Two scopes:
+
+- **Per-job stream**: `GET /v1/jobs/{id}/stream`. Events for one specific job.
+- **Workspace stream**: `GET /v1/events`. Events for every job in your workspace.
+
+Both use the standard [Server-Sent Events](https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events) wire format. You receive one-way updates over a single long-lived HTTP connection.
+
+<Note>
+The two streams use **different event names**. The per-job stream uses bare names (`progress`, `page`, `error`, `done`) because there's only one job it could be about. The workspace stream uses `job:`-prefixed names (`job:progress`, `job:completed`, `job:failed`) and includes a `jobId` field in every payload so a subscriber can route events to the right job. Don't confuse them in SDK code.
+</Note>
+
+## Per-job stream
+
+Open a stream for a specific job right after you create it:
+
+```ts
+const res = await fetch(`https://api.reader.dev/v1/jobs/${jobId}/stream`, {
+  headers: { "x-api-key": READER_KEY },
+});
+
+const reader = res.body!.getReader();
+// ... parse SSE frames ...
+```
+
+Events you'll see:
+
+| Event | Payload |
+| --- | --- |
+| `progress` | `{ status, completed, total }` |
+| `page` | A full page result, same shape as a sync scrape's `data` |
+| `error` | `{ url, error }` for a page that failed |
+| `done` | `{ status, completed, total }`. Final frame, stream closes |
+
+The stream terminates automatically when the job reaches a terminal state.
+
+Use the SDK's `stream(jobId)` generator if you're in TypeScript:
+
+```ts
+for await (const event of client.stream(jobId)) {
+  if (event.type === "page") handlePage(event.data);
+  if (event.type === "done") break;
+}
+```
+
+## Workspace stream
+
+`GET /v1/events` opens a single stream that emits events for every job in your workspace as they progress. Useful for dashboards that show "what's happening right now" without opening one stream per job.
+
+Events on this stream are prefixed by job ID:
+
+```
+event: job:progress
+data: {"jobId":"job_9fba2","status":"processing","completed":45,"total":100}
+
+event: job:completed
+data: {"jobId":"job_9fba2","status":"completed","completed":100,"total":100,"creditsUsed":100}
+
+event: job:failed
+data: {"jobId":"job_73ab1","error":"..."}
+```
+
+Unlike the per-job stream, the workspace stream never closes on its own. It keeps the connection open and sends a keep-alive ping every 30 seconds. Reconnect if the connection drops.
+
+## Keep-alives
+
+Both streams send a comment line (`: ping\n\n`) every 30 seconds so intermediate proxies and load balancers don't kill the connection as idle. Your SSE client should ignore comment lines; most libraries do this by default.
+
+## When to use SSE vs polling vs webhooks
+
+| Scenario | Best fit |
+| --- | --- |
+| Progress bar in a web UI, one job at a time | Per-job SSE |
+| Dashboard showing all workspace activity | Workspace SSE |
+| Server-side, job-completion-only signal | Webhook |
+| CLI / script that waits for one job and exits | Polling |
+
+SSE is the right tool when you're showing data to a human who is currently looking at it. Webhooks are the right tool when the listener is a service that keeps running regardless of who's watching.
+
+## Next
+
+- [Webhooks](/home/concepts/webhooks): push delivery when clients aren't online
+- [Async jobs](/home/concepts/async-jobs): the job lifecycle

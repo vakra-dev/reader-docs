@@ -1,0 +1,91 @@
+---
+title: "crawl()"
+description: "Discover and optionally scrape pages on a website via BFS."
+---
+
+## Signature
+
+```typescript
+reader.crawl(options: CrawlOptions): Promise<CrawlResult>
+```
+
+## Discover links only
+
+```javascript
+const result = await reader.crawl({
+  url: "https://docs.example.com",
+  depth: 2,
+  maxPages: 50,
+});
+
+for (const page of result.urls) {
+  console.log(page.url, "-", page.title);
+}
+```
+
+## Crawl and scrape in one call
+
+```javascript
+const result = await reader.crawl({
+  url: "https://docs.example.com",
+  depth: 2,
+  maxPages: 50,
+  scrape: true,
+  scrapeConcurrency: 3,
+});
+
+console.log(`Discovered: ${result.urls.length}`);
+console.log(`Scraped:    ${result.scraped?.batchMetadata.successfulUrls}`);
+```
+
+## Parameter
+
+`options: CrawlOptions` - see [CrawlOptions](/self-hosted/api-reference/crawl-options) for the full field list.
+
+The only required field is `url: string`. Everything else has defaults.
+
+## Return type
+
+`Promise<CrawlResult>` - see [CrawlResult](/self-hosted/api-reference/crawl-result) for the full shape.
+
+Key fields:
+
+```typescript
+{
+  urls: Array<{ url: string; title: string; description: string | null }>;
+  scraped?: ScrapeResult;   // only when scrape: true
+  metadata: {
+    totalUrls: number;
+    maxDepth: number;
+    totalDuration: number;
+    seedUrl: string;
+  };
+}
+```
+
+## BFS behavior
+
+`crawl()` does breadth-first search starting from `url`:
+
+1. Fetch the seed and extract links
+2. Filter: same domain, not visited, matches `includePatterns`, doesn't match `excludePatterns`, not blocked by robots.txt
+3. Enqueue matching links at `depth + 1` if within bounds
+4. Rate limit with `delayMs` between requests
+5. Stop when queue is empty or `maxPages` reached
+
+See [Crawling](/self-hosted/concepts/crawling) for the full mental model.
+
+## Sticky proxy
+
+When proxy pools are configured, `crawl()` picks one proxy at the start and uses it for every request in the session. This mimics real user browsing and avoids tripping anti-bot systems.
+
+## Where to go next
+
+<CardGroup cols={2}>
+  <Card title="CrawlOptions" icon="sliders" href="/self-hosted/api-reference/crawl-options">
+    Every option with type and default.
+  </Card>
+  <Card title="CrawlResult" icon="file-lines" href="/self-hosted/api-reference/crawl-result">
+    The full result type tree.
+  </Card>
+</CardGroup>

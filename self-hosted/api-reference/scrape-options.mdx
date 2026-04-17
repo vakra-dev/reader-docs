@@ -1,0 +1,126 @@
+---
+title: "ScrapeOptions"
+description: "Every field accepted by scrape() with type and default."
+---
+
+## Required
+
+| Option | Type | Description |
+|---|---|---|
+| `urls` | `string[]` | URLs to scrape. Pass a single-element array for a single page. |
+
+## Output
+
+| Option | Type | Default | Description |
+|---|---|---|---|
+| `formats` | `Array<"markdown" \| "html">` | `["markdown"]` | Output formats to include in results. `rawHtml` is always returned regardless of this setting. |
+
+## Request
+
+| Option | Type | Default | Description |
+|---|---|---|---|
+| `userAgent` | `string` | Chrome UA | Custom user agent string |
+| `headers` | `Record<string, string>` | `{}` | Additional HTTP headers |
+| `timeoutMs` | `number` | `30000` | Request timeout per URL |
+| `waitForSelector` | `string` | - | Wait for this CSS selector before extracting |
+| `skipTLSVerification` | `boolean` | `true` | Skip TLS certificate verification |
+
+## Content cleaning
+
+| Option | Type | Default | Description |
+|---|---|---|---|
+| `onlyMainContent` | `boolean` | `true` | Extract only main content (strips nav/header/footer) |
+| `includeTags` | `string[]` | `[]` | CSS selectors to keep - everything else is removed |
+| `excludeTags` | `string[]` | `[]` | CSS selectors to remove |
+| `removeAds` | `boolean` | `true` | Remove common ad selectors |
+| `removeBase64Images` | `boolean` | `true` | Strip inline base64 images |
+| `navigationSelectors` | `string[]` | `[]` | Additional CSS selectors to remove when `onlyMainContent` is true. Merged with built-in nav/footer/sidebar selectors. |
+
+## Retry & escalation
+
+| Option | Type | Default | Description |
+|---|---|---|---|
+| `hardDeadlineMs` | `number` | `30000` | Hard deadline for a single URL. After this, the scraper gives up. |
+| `datacenterTimeoutMs` | `number` | `10000` | Timeout for the first attempt on datacenter proxy. If no result, escalates to residential. |
+
+## Batch processing
+
+| Option | Type | Default | Description |
+|---|---|---|---|
+| `batchConcurrency` | `number` | `1` | Number of URLs to process in parallel |
+| `batchTimeoutMs` | `number` | `300000` | Total timeout for the batch (5 min) |
+| `maxRetries` | `number` | `2` | Max retries per URL before giving up |
+| `onProgress` | `(p: ProgressEvent) => void` | - | Progress callback |
+
+```typescript
+interface ProgressEvent {
+  completed: number;
+  total: number;
+  currentUrl: string;
+}
+```
+
+## Proxy
+
+| Option | Type | Default | Description |
+|---|---|---|---|
+| `proxy` | `ProxyConfig` | - | Single proxy to use for this request |
+| `proxyTier` | `"datacenter" \| "residential" \| "auto"` | - | Pick a proxy from the configured pool by tier |
+
+## Pluggable config
+
+These options let the caller inject platform-specific behavior. Reader ships with no built-in domain profiles, block detection patterns, or URL rewriters.
+
+| Option | Type | Default | Description |
+|---|---|---|---|
+| `domainProfiles` | `Record<string, DomainProfile>` | `{}` | Per-domain overrides (proxy tier, timeout, concurrency). Keyed by domain. |
+| `blockDetection` | `BlockDetectionConfig` | - | Bot page detection config. Without this, no content-based block detection runs. |
+| `urlRewriters` | `UrlRewriteRule[]` | `[]` | URL rewrite rules applied before scraping (e.g. Google Docs to export URL). |
+
+```typescript
+interface DomainProfile {
+  proxyTier?: "datacenter" | "residential";
+  timeoutMs?: number;
+  batchConcurrency?: number;
+  minDelayMs?: number;
+  maxConcurrentPerProxy?: number;
+}
+
+interface BlockDetectionConfig {
+  patterns?: Array<RegExp | string>;      // matched against page text
+  titlePatterns?: Array<RegExp | string>; // matched against page title
+  shortContentThreshold?: number;         // default: 500
+  longContentSignalThreshold?: number;    // default: 3
+}
+
+interface UrlRewriteRule {
+  name: string;
+  match: (url: URL) => boolean;
+  rewrite: (url: URL) => string;
+}
+```
+
+## URL filtering
+
+| Option | Type | Default | Description |
+|---|---|---|---|
+| `includePatterns` | `string[]` | `[]` | Regex patterns - URL must match at least one |
+| `excludePatterns` | `string[]` | `[]` | Regex patterns - URL must not match any |
+
+## Debugging
+
+| Option | Type | Default | Description |
+|---|---|---|---|
+| `verbose` | `boolean` | `false` | Enable Pino logging |
+| `showChrome` | `boolean` | `false` | Show the browser window |
+
+## Where to go next
+
+<CardGroup cols={2}>
+  <Card title="ScrapeResult" icon="file-lines" href="/self-hosted/api-reference/scrape-result">
+    The return type for every scrape call.
+  </Card>
+  <Card title="Content Extraction" icon="scissors" href="/self-hosted/concepts/content-extraction">
+    How the cleaning options behave.
+  </Card>
+</CardGroup>

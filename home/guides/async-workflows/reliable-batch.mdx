@@ -1,0 +1,162 @@
+---
+title: "Reliable batch processing"
+description: "Submit thousands of URLs, survive reconnects, and never lose a result."
+---
+
+A batch of 10,000 URLs on a noisy network is a different problem from a batch of 10. This guide covers the end-to-end patterns that keep large batches reliable: idempotency, webhook delivery, resuming after disconnects, and handling partial failures.
+
+## The five pillars
+
+1. **Idempotency key on the `/v1/read` POST**, so retries don't create duplicate jobs.
+2. **Track the job ID** in your own database immediately after submission.
+3. **Webhooks as the primary completion signal**, so a restart doesn't strand the job.
+4. **Poll as a fallback**, in case the webhook was dropped.
+5. **Retry failed URLs** rather than restarting the whole batch.
+
+## Submission
+
+```ts
+async function submitBatch(urls: string[], batchId: string) {
+  // 1. Idempotency: Reader dedupes POSTs with the same x-idempotency-key
+  const res = await fetch("https://api.reader.dev/v1/read", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "x-api-key": process.env.READER_KEY!,
+      "x-idempotency-key": `batch-${batchId}`,
+    },
+    body: JSON.stringify({
+      urls,
+      webhook: {
+        url: "https://your-app.example.com/hooks/reader",
+        events: ["job.completed", "job.failed"],
+      },
+    }),
+  });
+
+  const envelope = await res.json();
+  if (!envelope.success) throw new Error(envelope.error.message);
+
+  // 2. Save the job ID to your DB in the same transaction as the batch record
+  await db.batches.update({
+    where: { id: batchId },
+    data: { readerJobId: envelope.data.id, status: "submitted" },
+  });
+
+  return envelope.data.id;
+}
+```
+
+The `x-idempotency-key` is critical. If your request times out but Reader already accepted it, your retry with the same key returns the original job ID, not a new job. Without it, you'd submit the batch twice.
+
+## Completion via webhook
+
+```ts
+app.post("/hooks/reader", raw, async (req, res) => {
+  verify(req, secret); // see verification guide
+
+  const deliveryId = req.headers["x-reader-delivery"];
+  if (await alreadyProcessed(deliveryId)) return res.status(200).end();
+
+  const payload = JSON.parse(req.body.toString());
+  const event = req.headers["x-reader-event"];
+
+  if (event === "job.completed") {
+    // Enqueue slow work, don't do it inline
+    await jobQueue.push({
+      type: "hydrate-reader-results",
+      jobId: payload.jobId,
+    });
+  }
+  if (event === "job.failed") {
+    await db.batches.update({
+      where: { readerJobId: payload.jobId },
+      data: { status: "failed", error: payload.error },
+    });
+  }
+
+  await markProcessed(deliveryId);
+  res.status(200).end();
+});
+```
+
+## Hydrating results (the slow part)
+
+```ts
+async function hydrateResults(jobId: string) {
+  // Paginate through all results: don't assume the first page is all of them
+  const allResults = await client.getAllJobResults(jobId);
+
+  await db.$transaction(async (tx) => {
+    await tx.scrapeResults.createMany({
+      data: allResults.map((page) => ({
+        batchId: findBatchId(jobId),
+        url: page.url,
+        markdown: page.markdown,
+        statusCode: page.metadata?.statusCode,
+        error: page.error,
+        proxyMode: page.proxyMode,
+      })),
+    });
+
+    await tx.batches.update({
+      where: { readerJobId: jobId },
+      data: { status: "completed", completedAt: new Date() },
+    });
+  });
+}
+```
+
+## Fallback polling
+
+Webhooks can get lost: configuration mistakes, your endpoint being down when all three retries happen, a DNS outage. As a safety net, run a periodic job that polls Reader for any batches that have been `submitted` for more than some threshold:
+
+```ts
+// Every 5 minutes, sweep stuck batches
+setInterval(async () => {
+  const stuck = await db.batches.findMany({
+    where: {
+      status: "submitted",
+      submittedAt: { lt: new Date(Date.now() - 10 * 60_000) }, // 10 min old
+    },
+  });
+
+  for (const batch of stuck) {
+    const { job } = await client.getJob(batch.readerJobId, { limit: 1 });
+    if (["completed", "failed"].includes(job.status)) {
+      await hydrateResults(batch.readerJobId);
+    }
+  }
+}, 5 * 60_000);
+```
+
+## Retrying failed URLs
+
+When a batch completes with some failed URLs, you have two options:
+
+- **Accept the failures** (your data has `error` fields for those rows) and move on
+- **Retry the failed subset** with `POST /v1/jobs/{id}/retry`
+
+```ts
+const retrying = await client.retryJob(jobId);
+console.log(`Retrying ${retrying.retrying} failed URLs`);
+```
+
+Reader re-queues just the URLs that errored. You'll get another `job.completed` webhook when the retry finishes.
+
+## Monitoring
+
+Track in your own metrics:
+
+- Submission rate (batches / minute)
+- Completion time (webhook received - submitted)
+- Per-batch failure rate (`failed URLs / total URLs`)
+- Webhook delivery failures (via `deliveryStats`)
+
+If any of these drift, you'll know before your users do.
+
+## Next
+
+- [Webhook workflows](/home/guides/async-workflows/webhook-workflows)
+- [Webhook retries](/home/guides/async-workflows/webhook-retries)
+- [Retry and error handling](/home/guides/production/retry-error-handling)

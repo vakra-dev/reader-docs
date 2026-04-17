@@ -1,0 +1,58 @@
+---
+title: "Introduction"
+description: "Run the Reader scraping engine yourself - open-source Node library, CLI, and deployment scripts."
+---
+
+Reader is also available as an open-source Node library you can run yourself. It's the same engine that powers [Reader Cloud](/home/introduction), distributed under Apache 2.0.
+
+Most users should start with Reader Cloud - it handles proxies, browser management, scaling, and billing, and starts free with 1,000 credits a month. Self-hosting is worth the extra operational overhead when you need:
+
+- **Data residency or network isolation** - air-gapped environments, on-premise deployments, strict compliance
+- **A custom fork** - you want to modify scraping behavior, add new engines, or ship patches to your own version
+- **Extreme volume** - your workload is high enough that infrastructure costs beat API credits
+
+<Card title="reader on GitHub →" href="https://github.com/vakra-dev/reader" horizontal icon="github">
+  Full source, issues, Dockerfile, and examples.
+</Card>
+
+## Cloud vs Self-Hosted
+
+| Feature | Reader Cloud | Self-hosted |
+|---|---|---|
+| **Setup time** | Instant (sign up + API key) | Install Node, configure proxies, manage browsers |
+| **Proxies** | Managed pool included | You provide your own |
+| **Cost model** | Monthly credits (free tier: 1,000/mo) | Your infrastructure |
+| **Webhooks** | Built-in | Build your own |
+| **SSE events** | Built-in | Build your own |
+| **Scaling** | Automatic | You manage it |
+| **Updates** | Automatic | `npm update` |
+| **Support** | Discord + email | Community (GitHub) |
+| **Best for** | Shipping apps fast, LLM pipelines, RAG, agents | Compliance, isolation, custom forks, extreme volume |
+
+## What self-hosted Reader gives you
+
+- **`ReaderClient`** - high-level API with lazy initialization, browser pool management, and proxy rotation
+- **`scrape()` and `crawl()`** - the same primitives as the Cloud API
+- **Hero browser engine** - full headless Chrome with JavaScript execution, TLS fingerprinting, and anti-bot bypass
+- **Proxy escalation** - automatic datacenter-to-residential failover per URL
+- **Browser pool** - recycled Hero instances with health checks and graceful retirement
+- **CLI** - one-off scrapes, crawls, and a daemon mode with shared pool
+- **Pluggable config** - domain profiles, block detection, and URL rewriters are all caller-provided
+- **Deployment scripts** - production-ready Dockerfile and Docker Compose setup
+
+## Where to go next
+
+<CardGroup cols={2}>
+  <Card title="Installation" icon="download" href="/self-hosted/getting-started/installation">
+    Install the package and its system dependencies.
+  </Card>
+  <Card title="Quickstart" icon="bolt" href="/self-hosted/getting-started/quickstart">
+    Make your first scrape in 60 seconds.
+  </Card>
+  <Card title="Examples" icon="code" href="/self-hosted/getting-started/examples">
+    Real runnable examples for every feature.
+  </Card>
+  <Card title="API Reference" icon="book" href="/self-hosted/api-reference/reader-client">
+    Full type reference for every option and result.
+  </Card>
+</CardGroup>

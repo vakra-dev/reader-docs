@@ -1,0 +1,137 @@
+---
+title: "RAG: scrape, chunk, embed"
+description: "Build a retrieval-augmented pipeline from URL to vector database."
+---
+
+Retrieval-augmented generation (RAG) is the most common production use case for Reader. You scrape a corpus of documents, chunk the text, embed the chunks, and store them in a vector database. At query time you retrieve the most relevant chunks and feed them to an LLM with the user's question.
+
+Reader handles the scrape-to-markdown half. This guide shows how to connect it to the rest.
+
+## The pipeline
+
+```
+URLs ──▶ Reader ──▶ markdown ──▶ chunks ──▶ embeddings ──▶ vector DB
+                                                              │
+                                                  query ──▶ retrieve ──▶ LLM
+```
+
+## Step 1: scrape a corpus
+
+Use batch mode to fetch many URLs in one call:
+
+```ts
+import { ReaderClient } from "@vakra-dev/reader-js";
+
+const client = new ReaderClient({ apiKey: process.env.READER_KEY! });
+
+const result = await client.read({
+  urls: loadCorpusUrls(), // sitemap, RSS, database, etc.
+});
+
+if (result.kind !== "job") throw new Error("expected batch job");
+const pages = result.data.results.filter((p) => !p.error && p.markdown);
+```
+
+For very large corpora (thousands of URLs), use a webhook instead of polling so your worker isn't stuck waiting. See [Reliable batch processing](/home/guides/async-workflows/reliable-batch).
+
+## Step 2: chunk the markdown
+
+Break each document into chunks small enough to fit in your embedding model's context window. A reasonable default is ~500 tokens per chunk with 50-token overlap.
+
+```ts
+function chunkMarkdown(text: string, size = 500, overlap = 50): string[] {
+  // Rough: split on paragraph boundaries first, then by character count.
+  const paragraphs = text.split(/\n\n+/);
+  const chunks: string[] = [];
+  let current = "";
+
+  for (const p of paragraphs) {
+    if ((current + "\n\n" + p).length > size * 4) {
+      // ~4 chars per token
+      chunks.push(current.trim());
+      // Keep the tail of the previous chunk as overlap
+      current = current.slice(-overlap * 4) + "\n\n" + p;
+    } else {
+      current = current ? current + "\n\n" + p : p;
+    }
+  }
+  if (current.trim()) chunks.push(current.trim());
+
+  return chunks;
+}
+```
+
+For production, use a real tokenizer (e.g., `tiktoken`) instead of character-count estimates.
+
+## Step 3: embed and store
+
+```ts
+import OpenAI from "openai";
+const openai = new OpenAI();
+
+async function indexPage(page: { url: string; markdown: string; metadata: any }) {
+  const chunks = chunkMarkdown(page.markdown);
+
+  const embeddings = await openai.embeddings.create({
+    model: "text-embedding-3-small",
+    input: chunks,
+  });
+
+  const rows = chunks.map((text, i) => ({
+    id: `${page.url}#${i}`,
+    embedding: embeddings.data[i].embedding,
+    text,
+    sourceUrl: page.url,
+    sourceTitle: page.metadata?.title ?? null,
+  }));
+
+  await vectorDB.upsert(rows);
+}
+
+for (const page of pages) {
+  await indexPage(page);
+}
+```
+
+## Step 4: retrieve at query time
+
+```ts
+async function answer(question: string) {
+  const [queryEmbedding] = (
+    await openai.embeddings.create({
+      model: "text-embedding-3-small",
+      input: [question],
+    })
+  ).data;
+
+  const results = await vectorDB.query(queryEmbedding.embedding, { k: 5 });
+
+  const context = results
+    .map(
+      (r, i) =>
+        `[${i + 1}] Source: ${r.sourceTitle} (${r.sourceUrl})\n${r.text}`,
+    )
+    .join("\n\n---\n\n");
+
+  // Pass `context` to your LLM alongside the question
+  return callLLM({
+    system: "Answer using only the provided sources. Cite source numbers.",
+    user: `${context}\n\nQuestion: ${question}`,
+  });
+}
+```
+
+## Refreshing the index
+
+Reader's 24h cache means re-running your ingestion pipeline daily is cheap: anything that hasn't changed returns from cache (0 credits). Only the genuinely new and updated pages cost credits.
+
+For sites that update frequently, run a daily crawl or re-scrape. For stable docs, once a week or on-demand is enough.
+
+## Cost considerations
+
+Per URL in the ingestion pipeline: 1 credit (standard mode) to 3 credits (stealth). A 10,000-URL corpus in `auto` typically costs 10,000–15,000 credits depending on escalation rate. See [Cost estimation](/home/guides/production/cost-estimation) to pilot first.
+
+## Next
+
+- [Agent tool](/home/guides/llm/agent-tool): Reader behind an LLM tool call
+- [Structured data](/home/guides/llm/structured-data): when you need JSON, not prose

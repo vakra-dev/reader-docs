@@ -1,0 +1,28 @@
+---
+title: "Scrape, batch, or crawl"
+openapi: "openapi.json POST /v1/read"
+---
+
+`POST /v1/read` is the unified content-extraction endpoint. It auto-detects the operation from the body:
+
+- **Single `url`** → synchronous scrape, returned immediately in the response
+- **Multiple `urls`** → async batch job
+- **`url` + `maxDepth` or `maxPages`** → async crawl job
+
+See [The read primitive](/home/concepts/read-primitive) for a narrative overview.
+
+## Proxy mode
+
+Set `proxyMode` to `"standard"` (1 credit, fast), `"stealth"` (3 credits, bypasses bot walls), or `"auto"` (default, which tries standard first and escalates to stealth on block). The response metadata tells you which mode actually ran. See [Proxy modes](/home/concepts/proxy-modes).
+
+## Idempotency
+
+Pass an `x-idempotency-key` header to deduplicate retried POSTs. Reader caches the original response for 24 hours and returns it verbatim on any subsequent request with the same key.
+
+```bash
+curl -X POST https://api.reader.dev/v1/read \
+  -H "x-api-key: $READER_KEY" \
+  -H "x-idempotency-key: batch-2026-04-04-run-1" \
+  -H "Content-Type: application/json" \
+  -d '{ "urls": ["https://example.com/a", "https://example.com/b"] }'
+```

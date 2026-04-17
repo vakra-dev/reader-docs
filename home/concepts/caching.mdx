@@ -1,0 +1,86 @@
+---
+title: "Caching"
+description: "Free cache hits, 24-hour default TTL, and how to opt out."
+---
+
+Reader caches every successful synchronous scrape and serves the cached copy on subsequent requests for the same URL and extraction options. Cache hits are **free**: they do not consume credits, regardless of which proxy mode you'd otherwise pay for.
+
+## What gets cached
+
+- **Sync scrapes only.** Single-URL scrape requests that complete successfully.
+- **Not batch or crawl results.** Each URL in a batch is fetched fresh; crawl discovery doesn't cache.
+- **Not errors.** A failed scrape is not cached, so the next attempt gets a fresh try.
+
+## Cache key
+
+The key is a hash of:
+
+- The URL
+- `onlyMainContent`
+- `includeTags` and `excludeTags`
+- `waitForSelector`
+
+That means requesting the same URL with different extraction options produces different cache entries, so you don't accidentally get a cached "main content only" version when you asked for the full page.
+
+Things that **do not** affect the cache key:
+
+- `formats`: both markdown and html are stored together
+- `proxyMode`: once a page is cached, it's free to serve regardless of the mode you request
+- `timeoutMs`
+
+## TTL
+
+The default cache lifetime is **24 hours**. After that, the next request for the same key triggers a fresh fetch.
+
+## Opt out
+
+Pass `cache: false` to bypass the cache. Reader will fetch fresh and not look at what's stored:
+
+```json
+{ "url": "https://example.com/news", "cache": false }
+```
+
+Reader still writes the result to the cache on a successful fetch, so the next request (without `cache: false`) can hit it.
+
+## Detecting cache hits
+
+Every response metadata block includes a `cached` boolean:
+
+```json
+{
+  "data": {
+    "url": "...",
+    "markdown": "...",
+    "metadata": {
+      "cached": true,
+      "duration": 12,
+      "scrapedAt": "2026-04-04T09:30:00Z"
+    }
+  }
+}
+```
+
+When `cached: true`, `scrapedAt` is when the content was originally captured, not the moment you made the current request. Useful for "this content is N hours old" logic in your UI.
+
+## When to disable cache
+
+Cases where you should pass `cache: false`:
+
+- **Live data.** Stock tickers, sports scores, breaking-news feeds.
+- **Testing and debugging.** You're iterating on extraction options and want to see the effect of each change.
+- **Workflow correctness.** A downstream process depends on whether content has changed since the last run.
+
+Cases where you should leave cache on (most of the time):
+
+- **LLM pipelines.** Re-answering the same question doesn't need a fresh scrape if it was done yesterday.
+- **RAG indexing.** Re-indexing the same page within 24h is wasted credits.
+- **Idempotent batch jobs.** If the job retries, you want the retry to see the same content.
+
+## Cost savings
+
+A page that costs 1 credit in `standard` or 3 credits in `stealth` costs 0 credits on a cache hit. If you're doing development work against the same set of URLs all day, your first loop is the expensive one; everything after that is free until the TTL expires.
+
+## Next
+
+- [Credits and billing](/home/concepts/credits-and-billing)
+- [Proxy modes](/home/concepts/proxy-modes)

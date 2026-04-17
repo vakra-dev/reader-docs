@@ -1,0 +1,133 @@
+---
+title: "Using the CLI"
+description: "One-off scrapes and crawls from the terminal."
+---
+
+Reader ships with a CLI for quick scrapes, crawls, and scripting workflows. After `npm install @vakra-dev/reader`, you can run `reader` directly if you have it in your `PATH`, or invoke it via `npx reader` / `node node_modules/.bin/reader`.
+
+## Scrape a single URL
+
+```bash
+reader scrape https://example.com
+```
+
+Outputs JSON to stdout with the default format (`markdown`) and all metadata.
+
+## Write output to a file
+
+```bash
+reader scrape https://example.com -o output.json
+```
+
+## Multiple URLs in parallel
+
+```bash
+reader scrape https://example.com https://example.org https://example.net \
+  -c 3 \
+  -o batch.json
+```
+
+`-c 3` sets concurrency. The output is a single JSON file with all results in an array.
+
+## Choose formats
+
+```bash
+# Markdown only (default)
+reader scrape https://example.com
+
+# HTML only
+reader scrape https://example.com -f html
+
+# Both
+reader scrape https://example.com -f markdown,html
+```
+
+## Content cleaning flags
+
+```bash
+# Include full page content (disable main content extraction)
+reader scrape https://example.com --no-main-content
+
+# Keep only specific selectors
+reader scrape https://blog.example.com \
+  --include-tags ".article,.sidebar" \
+  --exclude-tags ".comments,.ads"
+```
+
+## Force an engine
+
+```bash
+# Wait for a specific element before extracting (useful for SPAs)
+reader scrape https://spa.example.com --wait-for ".dashboard-loaded"
+```
+
+## Use a proxy
+
+```bash
+reader scrape https://example.com \
+  --proxy http://user:pass@proxy.example.com:8080
+```
+
+## Crawl
+
+```bash
+# Discover links only
+reader crawl https://docs.example.com -d 2 -m 30
+
+# Crawl and scrape every page
+reader crawl https://docs.example.com -d 2 -m 30 --scrape -o docs.json
+```
+
+Flags:
+
+| Flag | Purpose |
+|---|---|
+| `-d, --depth <n>` | Max crawl depth (default: 1) |
+| `-m, --max-pages <n>` | Max pages (default: 20) |
+| `-s, --scrape` | Also scrape discovered pages |
+| `--delay <ms>` | Delay between requests |
+| `--include <pattern>` | URL regex to include |
+| `--exclude <pattern>` | URL regex to exclude |
+
+## Verbose output
+
+```bash
+reader scrape https://example.com -v
+```
+
+Enables Pino logging so you can see which engine won, how long it took, and any retry behavior.
+
+## Piping to other tools
+
+CLI always outputs JSON. Pipe it to `jq` for further processing:
+
+```bash
+reader scrape https://example.com | jq -r '.data[0].markdown'
+
+reader crawl https://docs.example.com --scrape |
+  jq -r '.scraped.data[] | .metadata.website.title'
+```
+
+## Exit codes
+
+- **0** - all URLs scraped successfully
+- **1** - one or more URLs failed (details in the JSON `errors` field)
+
+Useful in shell scripts:
+
+```bash
+if reader scrape "$URL" -o out.json; then
+  echo "Scraped successfully"
+else
+  echo "Scrape failed"
+  exit 1
+fi
+```
+
+## Where to go next
+
+<CardGroup cols={2}>
+  <Card title="Daemon Mode" icon="circle-play" href="/self-hosted/guides/daemon-mode">
+    Keep a warm browser pool for faster repeat CLI calls.
+  </Card>
+</CardGroup>

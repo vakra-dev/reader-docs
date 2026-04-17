@@ -1,0 +1,10 @@
+---
+title: "Get a job"
+openapi: "openapi.json GET /v1/jobs/{id}"
+---
+
+Returns the current state of a job and a page of its results. Results are paginated with `skip` and `limit` query parameters (default limit 20, max 100).
+
+Use the `pagination.next` URL from the response to fetch subsequent pages. The SDK clients do this automatically via `waitForJob()` and `getAllJobResults()`.
+
+See [Async jobs](/home/concepts/async-jobs) for the full lifecycle and result shape.

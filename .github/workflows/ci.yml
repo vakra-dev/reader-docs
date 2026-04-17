@@ -1,0 +1,30 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  validate:
+    name: Validate docs
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install Mintlify CLI
+        run: npm install -g mintlify
+
+      - name: Validate mint.json and MDX
+        run: mintlify broken-links || true
+        # Mintlify's link checker exits non-zero on external 4xx too; we
+        # report but don't fail the build on transient external failures.
+
+      - name: OpenAPI sanity check
+        run: |
+          node -e "JSON.parse(require('fs').readFileSync('openapi.json','utf8'))"

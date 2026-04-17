@@ -1,0 +1,82 @@
+---
+title: "Rate limits and concurrency"
+description: "Two limits: requests per minute and concurrent async jobs. How Reader enforces them and how to back off."
+---
+
+Reader enforces two kinds of limits, and they're independent. Understanding both will save you from confusing `429` errors.
+
+## The two limits
+
+| Limit | What it caps | Enforced by | Error code |
+| --- | --- | --- | --- |
+| **Rate limit (RPM)** | Total API requests per minute to `/v1/*` | Sliding 60-second window | `rate_limited` |
+| **Concurrency** | Active (queued or processing) async jobs at the same time | Point-in-time count | `concurrency_limited` |
+
+A request can hit both, but usually you'll hit rate limits first if you're firing sync scrapes in a loop, and concurrency first if you're kicking off batches or crawls.
+
+## Limits by tier
+
+| Tier | Rate (req/min) | Concurrency (active jobs) |
+| --- | --- | --- |
+| Free | 10 | 2 |
+| Pro | 60 | 10 |
+| Business | 200 | 50 |
+| Enterprise | 1,000 | 200 |
+
+## Rate limit errors
+
+When you exceed your RPM quota, Reader returns `429` with:
+
+```json
+{
+  "success": false,
+  "error": {
+    "code": "rate_limited",
+    "message": "Rate limit of 60 requests per 60s exceeded. Retry after 12s.",
+    "details": { "limit": 60, "windowSeconds": 60, "retryAfterSeconds": 12 },
+    "docsUrl": "https://reader.dev/docs/home/concepts/errors#rate-limited"
+  }
+}
+```
+
+Reader also sets the `Retry-After` response header to the same `retryAfterSeconds` value. **Honor it.** The SDKs do this automatically: they back off and retry once the window reopens.
+
+## Concurrency errors
+
+When you already have N active async jobs (where N is your tier limit) and try to create another, you get `429` with a different code:
+
+```json
+{
+  "success": false,
+  "error": {
+    "code": "concurrency_limited",
+    "message": "Concurrency limit reached. You have 10 active jobs (limit: 10).",
+    "details": { "active": 10, "max": 10 }
+  }
+}
+```
+
+`concurrency_limited` doesn't include a `Retry-After` because Reader can't predict when your existing jobs will finish. Poll them, cancel stale ones, or wait for your webhook.
+
+## What counts as an active job
+
+A job is "active" as long as its status is `queued` or `processing`. Once a job reaches `completed`, `failed`, or `cancelled`, it no longer counts against your concurrency limit, even though it stays in your history.
+
+Sync scrapes (single-URL `POST /v1/read`) are not jobs. They don't count toward concurrency.
+
+## Per-key rate limits
+
+On Pro and above, you can set a custom RPM override on individual API keys, useful when you want different keys to share a workspace quota but cap each one. This is managed in the dashboard.
+
+## Strategies for hitting limits
+
+- **Use batch instead of a loop.** One `POST /v1/read` with 1,000 URLs counts as one request toward your RPM and one job toward your concurrency, instead of 1,000 sync scrapes firing at your rate limit.
+- **Wait on webhooks, not polling.** Polling `GET /v1/jobs/{id}` every second is 60 RPM per job. Subscribe a webhook instead.
+- **Stagger job creation.** If you need to run 100 crawls, don't kick them off in parallel. Queue them yourself and start new ones as old ones finish.
+
+See the [Rate limits guide](/home/guides/production/rate-limits) for code patterns.
+
+## Next
+
+- [Async jobs](/home/concepts/async-jobs): how concurrency works in practice
+- [Errors](/home/concepts/errors): full error code list

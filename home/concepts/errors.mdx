@@ -1,0 +1,159 @@
+---
+title: "Errors"
+description: "Eleven stable error codes. Branch on code, not on message."
+---
+
+Every error response from Reader uses the same envelope:
+
+```json
+{
+  "success": false,
+  "error": {
+    "code": "insufficient_credits",
+    "message": "You need 50 credits but only 10 are available.",
+    "details": { "required": 50, "available": 10, "resetAt": "2026-05-01T00:00:00Z" },
+    "docsUrl": "https://reader.dev/docs/home/concepts/errors#insufficient-credits"
+  }
+}
+```
+
+Branch your code on `error.code`. The `message` is human-readable and Reader may reword it over time. The `code` is a stable contract.
+
+Every response (including errors) includes an `x-request-id` HTTP header. Include that in any support ticket and we can find the exact request in our logs.
+
+## The 11 codes
+
+### `invalid_request`
+
+**HTTP:** 400
+
+**Cause:** The request body failed validation. Missing required fields, malformed values, or fields outside their allowed range.
+
+**What to do:** Fix the request. `error.details.issues` contains per-field validation errors from the JSON schema.
+
+```json
+{
+  "code": "invalid_request",
+  "message": "Invalid request body",
+  "details": { "issues": [{ "path": ["url"], "message": "Invalid url" }] }
+}
+```
+
+### `unauthenticated`
+
+**HTTP:** 401
+
+**Cause:** Missing, invalid, revoked, or expired `x-api-key` header.
+
+**What to do:** Check that your key is set, active, and hasn't expired. Keys are revokable from the dashboard.
+
+### `insufficient_credits`
+
+**HTTP:** 402
+
+**Cause:** Your workspace balance is below the cost of the request.
+
+**What to do:** Top up credits, wait for the next reset (`details.resetAt`), or switch the request to a cheaper proxy mode.
+
+```json
+{
+  "code": "insufficient_credits",
+  "details": { "required": 50, "available": 10, "resetAt": "2026-05-01T00:00:00Z" }
+}
+```
+
+See the [Credit exhaustion guide](/home/guides/production/credit-exhaustion).
+
+### `url_blocked`
+
+**HTTP:** 403
+
+**Cause:** Reader refused to fetch the URL. Reasons include private/internal IP addresses, non-HTTP schemes, `file://` URLs, or URLs that resolve to loopback. Reader blocks these to prevent SSRF attacks.
+
+**What to do:** Use a public HTTPS URL. If you think the block is wrong, check `details.reason` and file an issue.
+
+### `not_found`
+
+**HTTP:** 404
+
+**Cause:** The resource you're asking about doesn't exist. Usually a job ID that never existed, a webhook ID you already deleted, or an API key that doesn't belong to your workspace.
+
+**What to do:** Double-check the ID.
+
+### `conflict`
+
+**HTTP:** 409
+
+**Cause:** The operation can't run in the resource's current state. Most common case: trying to cancel a job that's already `completed`, `failed`, or `cancelled`.
+
+**What to do:** Check the current state first. `conflict` errors don't benefit from retries.
+
+### `rate_limited`
+
+**HTTP:** 429
+
+**Cause:** You exceeded your workspace's requests-per-minute quota.
+
+**What to do:** Honor the `Retry-After` response header (also in `details.retryAfterSeconds`). The SDKs do this automatically. Consider batching sync scrapes into a single `urls: [...]` request: one request counts as one toward your RPM regardless of URL count.
+
+```json
+{
+  "code": "rate_limited",
+  "details": { "limit": 60, "windowSeconds": 60, "retryAfterSeconds": 12 }
+}
+```
+
+### `concurrency_limited`
+
+**HTTP:** 429
+
+**Cause:** You already have the maximum number of active jobs (queued or processing) for your tier.
+
+**What to do:** Wait for an existing job to finish, cancel a stale one, or upgrade your tier. There's no `Retry-After` header because Reader can't predict when your jobs will complete.
+
+### `internal_error`
+
+**HTTP:** 500
+
+**Cause:** An unexpected server-side error. This is on us.
+
+**What to do:** Retry with exponential backoff. If it persists, include the `x-request-id` from the response in a support ticket.
+
+### `upstream_unavailable`
+
+**HTTP:** 502
+
+**Cause:** Reader couldn't reach the target site or an internal service after retries. Either the target is down, DNS failed, or the connection was reset repeatedly.
+
+**What to do:** Retry after a delay. If a specific URL keeps failing, the site is probably the problem; test it from a browser.
+
+### `scrape_timeout`
+
+**HTTP:** 504
+
+**Cause:** The scrape exceeded the per-URL deadline (default 30s). This includes both the datacenter and residential proxy attempts.
+
+**What to do:** Retry, or try a different proxy mode if the site is consistently slow.
+
+## Retry matrix
+
+| Code | Retry? | How |
+| --- | --- | --- |
+| `invalid_request` | No | Fix the request |
+| `unauthenticated` | No | Fix the key |
+| `insufficient_credits` | No | Top up or wait for reset |
+| `url_blocked` | No | Use a different URL |
+| `not_found` | No | Fix the ID |
+| `conflict` | No | Check state first |
+| `rate_limited` | **Yes** | Honor `Retry-After` |
+| `concurrency_limited` | **Yes** | Wait for jobs to finish |
+| `internal_error` | **Yes** | Exponential backoff |
+| `upstream_unavailable` | **Yes** | Exponential backoff |
+| `scrape_timeout` | **Yes** | Maybe bump `timeoutMs` first |
+
+The SDKs implement this matrix automatically: transient codes retry, permanent codes throw immediately.
+
+## Next
+
+- [Retry and error handling guide](/home/guides/production/retry-error-handling)
+- [Credit exhaustion guide](/home/guides/production/credit-exhaustion)

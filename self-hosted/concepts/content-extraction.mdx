@@ -1,0 +1,104 @@
+---
+title: "Content Extraction"
+description: "How Reader identifies main content and strips noise from scraped pages."
+---
+
+Content extraction is what makes Reader output useful for LLMs. A raw web page is full of navigation, sidebars, footers, ads, cookie banners, and scripts - all tokens your model has to pay for and ignore. Reader strips all of that and gives you the article body.
+
+## Default behavior
+
+With `onlyMainContent: true` (the default), Reader runs a multi-step extraction:
+
+1. **Find the main content container** in priority order:
+   - `<main>` element
+   - `[role="main"]` attribute
+   - Single `<article>` element
+   - Common content IDs and classes: `#content`, `.post-content`, `.article-body`, etc.
+   - Largest text block (fallback heuristic)
+
+2. **Remove navigation chrome** (if no main content container was found):
+   - `<nav>`, `<header>`, `<footer>`, `<aside>`
+   - Sidebars, menus, breadcrumbs
+   - Social sharing widgets, comment sections
+   - Newsletter forms, cookie banners
+
+3. **Always remove** (regardless of mode):
+   - `<script>`, `<style>`, `<noscript>`, `<template>`
+   - Hidden elements (`display: none`, `visibility: hidden`)
+   - Overlays, modals, popups
+   - Fixed and sticky positioned elements
+   - Ad selectors and tracking pixels
+   - Base64 inline images (unless `removeBase64Images: false`)
+
+4. **Resolve responsive images** - `srcset` attributes are parsed and the highest-resolution image is kept in the output.
+
+The result is a clean HTML tree that's then converted to markdown via supermarkdown.
+
+## Disabling main content extraction
+
+For full-page capture (including nav, header, footer), set `onlyMainContent: false`:
+
+```javascript
+const result = await reader.scrape({
+  urls: ["https://example.com"],
+  onlyMainContent: false,
+});
+```
+
+Use this when:
+- You're scraping a landing page where the "main content" is the whole page
+- You need to extract links from navigation
+- You're debugging and want to see what Reader sees before cleaning
+
+## Tag filtering with CSS selectors
+
+For fine-grained control, use `includeTags` and `excludeTags`:
+
+```javascript
+const result = await reader.scrape({
+  urls: ["https://blog.example.com/post"],
+  includeTags: [".article-content", "#main-body"],
+  excludeTags: [".comments", ".related-posts", ".author-bio"],
+});
+```
+
+- **`includeTags`** - keep only elements matching these selectors. Everything else is removed.
+- **`excludeTags`** - remove elements matching these selectors. Everything else is kept.
+
+You can use `includeTags` and `excludeTags` together. Include runs first, then exclude.
+
+## Why Reader is conservative with nav/header/footer
+
+Many modern sites put actual content inside `<nav>` or `<header>` elements - for example, a docs sidebar lives in `<nav>` but contains links you want to crawl. Reader's extraction is deliberately **conservative by default**: if a `<main>` or `<article>` container is found, the surrounding chrome is kept (because it might contain content you need), and only gets stripped if no main container was detected.
+
+If you want aggressive stripping for a site where the `<main>` detection isn't kicking in, use `excludeTags` explicitly:
+
+```javascript
+await reader.scrape({
+  urls: [...],
+  excludeTags: ["nav", "header", "footer", "aside"],
+});
+```
+
+## Markdown conversion
+
+After extraction, the cleaned HTML is converted to markdown via **supermarkdown** - a Rust-backed converter optimized for LLM input. It handles:
+
+- Headings, lists, tables
+- Code blocks with language detection
+- Links and images (resolved to absolute URLs)
+- Blockquotes and inline formatting
+- Unicode and emoji preservation
+
+The output is deterministic and LLM-friendly. Reader does not add extra whitespace, comments, or metadata to the markdown.
+
+## Where to go next
+
+<CardGroup cols={2}>
+  <Card title="Scraping" icon="file-lines" href="/self-hosted/concepts/scraping">
+    Back to the full scrape pipeline.
+  </Card>
+  <Card title="ScrapeOptions reference" icon="book" href="/self-hosted/api-reference/scrape-options">
+    All content extraction options listed.
+  </Card>
+</CardGroup>

@@ -1,0 +1,138 @@
+---
+title: "Errors"
+description: "Full reference of every error class thrown by Reader."
+---
+
+All errors extend the base `ReaderError` class and carry a typed `code`, a `retryable` flag, and a `toJSON()` method for structured logging.
+
+```typescript
+import { ReaderError } from "@vakra-dev/reader";
+
+try {
+  await reader.scrape({ urls: ["https://example.com"] });
+} catch (err) {
+  if (err instanceof ReaderError) {
+    console.error({
+      code: err.code,
+      message: err.message,
+      retryable: err.retryable,
+      url: err.url,
+    });
+  }
+}
+```
+
+## Base class
+
+```typescript
+class ReaderError extends Error {
+  code: ReaderErrorCode;
+  url?: string;
+  retryable: boolean;
+  cause?: Error;
+  toJSON(): SerializedError;
+}
+```
+
+Every error in the table below extends `ReaderError`.
+
+## Error reference
+
+| Error class | Code | Retryable | When it's thrown |
+|---|---|---|---|
+| `NetworkError` | `NETWORK_ERROR` | ✅ | Connection reset, socket error, network unreachable |
+| `TimeoutError` | `TIMEOUT` | ✅ | Request or page load exceeded `timeoutMs` |
+| `DNSError` | `DNS_ERROR` | ❌ | Cannot resolve hostname |
+| `TLSError` | `TLS_ERROR` | ✅ | SSL/certificate handshake failed |
+| `CloudflareError` | `CLOUDFLARE_CHALLENGE` | ✅ | Cloudflare challenge didn't resolve in time |
+| `BotDetectedError` | `BOT_DETECTED` | ✅ | Bot detection page detected in response |
+| `AccessDeniedError` | `ACCESS_DENIED` | ❌ | 401/403 returned by the origin |
+| `ProxyConnectionError` | `PROXY_CONNECTION_ERROR` | ✅ | Proxy unreachable or auth failed |
+| `ProxyExhaustedError` | `PROXY_EXHAUSTED` | ❌ | All proxy tiers tried and failed |
+| `ContentExtractionError` | `CONTENT_EXTRACTION_FAILED` | ❌ | HTML parsing failed - likely corrupt response |
+| `EmptyContentError` | `EMPTY_CONTENT` | ✅ | Content below minimum length (50 chars) - could be rate limit |
+| `ContentTooLargeError` | `CONTENT_TOO_LARGE` | ❌ | HTML exceeds maximum size limit |
+| `MarkdownConversionError` | `MARKDOWN_CONVERSION_FAILED` | ❌ | supermarkdown couldn't convert the HTML |
+| `InvalidUrlError` | `INVALID_URL` | ❌ | URL parsing failed |
+| `ValidationError` | `INVALID_OPTIONS` | ❌ | Invalid options passed to scrape/crawl |
+| `RobotsBlockedError` | `ROBOTS_BLOCKED` | ❌ | URL blocked by robots.txt |
+| `BrowserPoolError` | `BROWSER_ERROR` | ✅ | Pool initialization or instance failure |
+| `ClientClosedError` | `CLIENT_CLOSED` | ❌ | Client has already been closed |
+| `NotInitializedError` | `NOT_INITIALIZED` | ❌ | Internal - component not initialized (bug report this) |
+| `RetryBudgetExhaustedError` | `RETRY_BUDGET_EXHAUSTED` | ❌ | All retries (engine switch, proxy escalation, general) exhausted |
+
+## Importing specific error classes
+
+```typescript
+import {
+  ReaderError,
+  NetworkError,
+  TimeoutError,
+  CloudflareError,
+  BotDetectedError,
+  AccessDeniedError,
+  ProxyConnectionError,
+  ProxyExhaustedError,
+  RobotsBlockedError,
+  ValidationError,
+  InvalidUrlError,
+  RetryBudgetExhaustedError,
+} from "@vakra-dev/reader";
+```
+
+## Serialized error format
+
+Every `ReaderError` instance has a `toJSON()` method for structured logging:
+
+```typescript
+interface SerializedError {
+  name: string;
+  code: ReaderErrorCode;
+  message: string;
+  url?: string;
+  timestamp: string;    // ISO timestamp
+  retryable: boolean;
+  cause?: string;       // Original error message if wrapped
+  stack?: string;
+  // ... error-specific fields (timeoutMs, challengeType, etc.)
+}
+```
+
+Use it to ship errors to Datadog, Sentry, or whatever observability stack you're running:
+
+```javascript
+try {
+  await reader.scrape({ urls: [...] });
+} catch (err) {
+  if (err instanceof ReaderError) {
+    logger.error(err.toJSON());
+  } else {
+    logger.error({ message: err.message, stack: err.stack });
+  }
+}
+```
+
+## Retry pattern using the flag
+
+```javascript
+async function scrapeWithRetry(url, maxAttempts = 3) {
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    try {
+      return await reader.scrape({ urls: [url] });
+    } catch (err) {
+      if (!(err instanceof ReaderError) || !err.retryable || attempt === maxAttempts - 1) {
+        throw err;
+      }
+      await new Promise(r => setTimeout(r, 1000 * Math.pow(2, attempt)));
+    }
+  }
+}
+```
+
+## Where to go next
+
+<CardGroup cols={2}>
+  <Card title="Error Handling concept" icon="shield-halved" href="/self-hosted/concepts/error-handling">
+    Retry budgets and how errors propagate through the pipeline.
+  </Card>
+</CardGroup>

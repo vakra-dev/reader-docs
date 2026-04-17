@@ -1,0 +1,93 @@
+---
+title: "SDKs"
+description: "Official SDKs for the Reader API in JavaScript/TypeScript and Python."
+---
+
+Reader provides first-party SDKs that wrap `POST /v1/read`, handle async job polling, parse the envelope contract, and throw typed errors.
+
+## Available SDKs
+
+| Language | Package | Install |
+|----------|---------|---------|
+| JavaScript / TypeScript | `@vakra-dev/reader-js` | `npm install @vakra-dev/reader-js` |
+| Python | `reader-py` | `pip install reader-py` |
+
+## Quick comparison
+
+<CodeGroup>
+```typescript JavaScript
+import { ReaderClient } from "@vakra-dev/reader-js";
+
+const client = new ReaderClient({ apiKey: process.env.READER_KEY! });
+
+const result = await client.read({ url: "https://example.com" });
+if (result.kind === "scrape") {
+  console.log(result.data.markdown);
+}
+```
+
+```python Python
+from reader_py import ReaderClient
+
+client = ReaderClient(api_key=os.environ["READER_KEY"])
+
+result = client.read(url="https://example.com")
+if result.kind == "scrape":
+    print(result.data.markdown)
+```
+</CodeGroup>
+
+Both SDKs return a **discriminated result**: `kind: "scrape"` for single-URL requests, `kind: "job"` for batches and crawls. The SDK auto-polls async jobs to completion and collects all paginated results before returning.
+
+## Features
+
+| Feature | reader-js | reader-py |
+|---|---|---|
+| Sync scrape | ✓ | ✓ |
+| Batch & crawl auto-poll | ✓ | ✓ |
+| Async client | (native fetch is async) | `AsyncReaderClient` |
+| SSE streaming | `client.stream(jobId)` | `client.stream(jobId)` |
+| Typed errors (11 codes) | ✓ | ✓ |
+| Auto-pagination of job results | ✓ | ✓ |
+| Retry with exponential backoff | ✓ | ✓ |
+| Honors `Retry-After` on 429 | ✓ | ✓ |
+
+## Error handling
+
+Errors from the API are parsed into specific exception subclasses so you can branch on the error type rather than HTTP status:
+
+<CodeGroup>
+```typescript JavaScript
+import { InsufficientCreditsError, RateLimitedError } from "@vakra-dev/reader-js";
+
+try {
+  await client.read({ url });
+} catch (err) {
+  if (err instanceof InsufficientCreditsError) {
+    console.error(`Need ${err.required}, have ${err.available}`);
+  } else if (err instanceof RateLimitedError) {
+    console.error(`Retry after ${err.retryAfterSeconds}s`);
+  } else {
+    throw err;
+  }
+}
+```
+
+```python Python
+from reader_py import InsufficientCreditsError, RateLimitedError
+
+try:
+    client.read(url=url)
+except InsufficientCreditsError as err:
+    print(f"Need {err.required}, have {err.available}")
+except RateLimitedError as err:
+    print(f"Retry after {err.retry_after_seconds}s")
+```
+</CodeGroup>
+
+The full catalog of 11 error codes is documented on the [Errors](/home/concepts/errors) page.
+
+## Next
+
+- [JavaScript SDK](/sdk/javascript): installation and full API reference
+- [Python SDK](/sdk/python): installation and full API reference

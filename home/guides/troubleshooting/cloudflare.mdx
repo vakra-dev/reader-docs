@@ -1,0 +1,102 @@
+---
+title: "Cloudflare and bot walls"
+description: "When Reader gets through automatically, when to force stealth, and when a site is out of reach."
+---
+
+The #1 reason scrapes come back with thin or wrong content is the target site sitting behind a bot-detection layer: Cloudflare, Akamai, PerimeterX, Datadome, or similar. The site serves real content to browsers and a "checking your browser" page to everything else. Reader handles most of these cases automatically, but not all.
+
+## How Reader handles it
+
+In `auto` mode (the default), Reader tries `standard` first (datacenter proxy). If the response looks like a bot wall (a challenge page, 403, or HTML that doesn't match what a browser would see), Reader retries with `stealth` automatically. `stealth` uses residential proxy IPs that bypass the common bot detection vendors.
+
+In most cases you don't need to do anything. The retry happens under the hood and you get clean content. You can see what happened in the response:
+
+```json
+{
+  "data": {
+    "metadata": {
+      "proxyMode": "stealth",
+      "proxyEscalated": true,
+      "duration": 2341
+    }
+  }
+}
+```
+
+`proxyEscalated: true` means Reader hit a wall on standard, retried with stealth, and that worked. 3 credits charged instead of 1.
+
+## When auto doesn't work
+
+Some sites are hostile enough that even stealth can't get in, or the automatic escalation heuristics miss a block that looks like a normal response. Symptoms:
+
+- `metadata.statusCode` is 200 but the markdown is very short
+- The markdown contains phrases like "please enable JavaScript", "checking your browser", or "access denied"
+- The same URL in a browser shows totally different content
+
+Reader thinks the scrape succeeded, but what you got isn't the real page.
+
+## Force stealth explicitly
+
+If you suspect the auto-escalation isn't kicking in, force stealth:
+
+```ts
+await client.read({
+  url: "https://hostile-site.example.com/page",
+  proxyMode: "stealth",
+});
+```
+
+This skips the standard attempt entirely and goes straight to the bypass strategy. 3 credits per page from the start.
+
+If forcing stealth gives you real content, the problem was that auto wasn't detecting the block correctly. Stick with explicit stealth for that site.
+
+## When stealth doesn't work either
+
+If stealth-mode scrapes also come back thin, the site is beyond Reader's reach. Common offenders:
+
+- Sites with CAPTCHAs that require human interaction
+- Sites using very new or custom bot detection that our stealth mode hasn't learned
+- Sites that require a logged-in session
+
+For these, your options are:
+
+1. **Use the site's official API** if they have one
+2. **Scrape with your own session** (cookies, auth, manual CAPTCHA solving) and only use Reader for the public parts
+3. **File an issue.** Sometimes we can tune stealth for a specific site
+
+## The `waitForSelector` trick
+
+If a page loads a shell and then hydrates content client-side, even stealth won't give you the real markdown unless the page has finished hydrating. Combine stealth with `waitForSelector`:
+
+```ts
+await client.read({
+  url: "https://shop.example.com/item/42",
+  proxyMode: "stealth",
+  waitForSelector: ".product-price",
+});
+```
+
+Reader waits for `.product-price` to appear before capturing, ensuring you see the fully-rendered post-hydration DOM.
+
+## Detecting thin results in code
+
+Set a minimum content length and flag anything below it:
+
+```ts
+const result = await client.read({ url });
+if (result.kind === "scrape") {
+  const markdown = result.data.markdown ?? "";
+  if (markdown.length < 500) {
+    console.warn("Suspiciously short result, possible block:", url);
+    // Retry with stealth, or alert
+  }
+}
+```
+
+The exact threshold depends on the type of content you're scraping. A product detail page under 500 chars is almost certainly a block; a news headline page might legitimately be shorter.
+
+## Next
+
+- [Auth walls](/home/guides/advanced/auth-walls)
+- [Choosing a proxy mode](/home/guides/advanced/choosing-a-proxy-mode)
+- [Proxy modes (concept)](/home/concepts/proxy-modes)

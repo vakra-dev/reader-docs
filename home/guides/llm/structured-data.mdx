@@ -1,0 +1,112 @@
+---
+title: "Structured data extraction"
+description: "From markdown to JSON. Extract fields with an LLM on top of Reader."
+---
+
+Reader returns markdown. For many workflows you actually want structured data: a product's price, a recipe's ingredients, an event's date and venue. The answer is a two-step pipeline: Reader to get clean content, then an LLM to extract the fields you want.
+
+## Why not ask Reader for JSON directly?
+
+We thought about building structured extraction into Reader. We chose not to for three reasons:
+
+1. **The shape you want is yours, not ours.** Every use case has different fields. A product extractor needs price, title, SKU; a recipe extractor needs ingredients, steps, times; a job listing extractor needs title, company, location, salary. A single "structured extraction" feature in Reader would have to cover every shape and still fall short.
+2. **LLMs are already great at this.** A one-shot prompt with a JSON schema gets you 95% of the way there on most content.
+3. **It keeps Reader focused.** Reader does one thing well: web content to clean markdown.
+
+## The minimal extractor
+
+```ts
+import { ReaderClient } from "@vakra-dev/reader-js";
+import Anthropic from "@anthropic-ai/sdk";
+import { z } from "zod";
+
+const reader = new ReaderClient({ apiKey: process.env.READER_KEY! });
+const anthropic = new Anthropic();
+
+// Define the shape you want
+const ProductSchema = z.object({
+  title: z.string(),
+  price: z.number().nullable(),
+  currency: z.string().nullable(),
+  description: z.string().nullable(),
+  inStock: z.boolean().nullable(),
+});
+type Product = z.infer<typeof ProductSchema>;
+
+async function extractProduct(url: string): Promise<Product> {
+  // 1. Get the page as clean markdown
+  const result = await reader.read({ url });
+  if (result.kind !== "scrape") throw new Error("unexpected");
+  const content = result.data.markdown ?? "";
+
+  // 2. Ask an LLM to extract the fields
+  const response = await anthropic.messages.create({
+    model: "claude-opus-4-6",
+    max_tokens: 1024,
+    messages: [
+      {
+        role: "user",
+        content: `Extract the following fields from this product page.
+Return JSON only, no commentary.
+
+Fields:
+- title (string)
+- price (number, without currency symbol)
+- currency (3-letter ISO code)
+- description (string, max 500 chars)
+- inStock (boolean, true if available)
+
+If a field isn't present, return null.
+
+Page content:
+${content}`,
+      },
+    ],
+  });
+
+  const text = response.content[0].type === "text" ? response.content[0].text : "";
+  const json = JSON.parse(text.match(/\{[\s\S]*\}/)?.[0] ?? "{}");
+
+  // 3. Validate with zod (throws if the LLM hallucinated a wrong shape)
+  return ProductSchema.parse(json);
+}
+
+const product = await extractProduct("https://shop.example.com/item/42");
+console.log(product);
+```
+
+## Tips for reliable extraction
+
+- **Use tool calling / structured output mode** if your model supports it. Claude's tool use and OpenAI's JSON mode let you pass the schema directly and get conforming JSON back instead of parsing markdown-wrapped JSON yourself.
+- **Validate with a schema library.** `zod`, `pydantic`, or similar catches hallucinated fields before they contaminate your database.
+- **Keep the field list short.** A prompt asking for 30 fields is less reliable than three calls asking for 10 each.
+- **Include examples** if accuracy matters. Two or three "here's a page, here's the right extraction" pairs in the prompt dramatically improve consistency.
+- **Pin the model version.** Extraction behavior changes across model releases. Lock the version for stable pipelines.
+
+## Extracting from structured metadata
+
+Before reaching for an LLM, check if the page has structured metadata you can read directly. Reader preserves JSON-LD and OpenGraph tags in the page, but they're not surfaced separately; you'd parse them yourself if present. For many e-commerce and article pages, JSON-LD (`<script type="application/ld+json">`) contains the exact fields you want with no ambiguity.
+
+Request `formats: ["markdown", "html"]` and parse JSON-LD out of the HTML for the deterministic path, falling back to LLM extraction when it's not present.
+
+## Batch extraction
+
+For many URLs:
+
+```ts
+const batch = await reader.read({ urls: productUrls });
+if (batch.kind === "job") {
+  const products = await Promise.all(
+    batch.data.results
+      .filter((r) => !r.error && r.markdown)
+      .map((r) => extractWithLLM(r.markdown!)),
+  );
+}
+```
+
+Run the LLM extraction step in parallel. Reader's already done the expensive part.
+
+## Next
+
+- [LLM pipeline](/home/guides/llm/llm-pipeline)
+- [Batch scraping](/home/guides/advanced/batch-scraping)

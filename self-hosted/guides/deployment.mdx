@@ -1,0 +1,164 @@
+---
+title: "Deployment"
+description: "Run Reader in production with Docker or bare metal."
+---
+
+Two common deployment patterns, in order of operational complexity: Docker and bare metal Linux.
+
+## Docker
+
+Reader ships with a production-ready Dockerfile and compose file in `examples/deployment/docker/` in the [GitHub repo](https://github.com/vakra-dev/reader).
+
+### docker-compose.yml
+
+```yaml
+version: "3.8"
+services:
+  reader:
+    build: .
+    platform: linux/amd64
+    ports:
+      - "3001:3001"
+    shm_size: "2gb"
+    security_opt:
+      - seccomp:unconfined
+    cap_add:
+      - SYS_ADMIN
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: unless-stopped
+```
+
+### Critical Docker constraints
+
+These are not optional - Reader will fail in subtle ways without them:
+
+- **`platform: linux/amd64`** - Chromium is bundled as x86_64 only. On Apple Silicon Macs, Docker will emulate x86_64 (slow); on a remote x86_64 Linux host, it runs natively.
+- **`shm_size: 2gb`** - Chrome uses `/dev/shm` heavily. The Docker default of 64 MB causes crashes with unhelpful errors.
+- **`seccomp:unconfined`** and **`cap_add: SYS_ADMIN`** - required for the Chrome sandbox. Without these, Chrome fails to spawn child processes.
+- **Base image: `node:22-slim`** plus Chrome system libraries (installed in the Dockerfile).
+
+### Running it
+
+```bash
+cd examples/deployment/docker
+docker-compose up -d
+
+curl http://localhost:3001/health
+# {"status":"ok"}
+
+curl -X POST http://localhost:3001/scrape \
+  -H "Content-Type: application/json" \
+  -d '{"urls": ["https://example.com"]}'
+```
+
+The example container exposes a small HTTP API wrapping `ReaderClient`. Adapt it to your needs.
+
+## Bare metal Linux
+
+Install directly on a Linux server if you don't want Docker.
+
+```bash
+# Install Node 22 via nvm
+curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.5/install.sh | bash
+source ~/.bashrc
+nvm install 22
+nvm use 22
+
+# Install Chrome system dependencies
+sudo apt-get update && sudo apt-get install -y \
+  wget gnupg ca-certificates curl \
+  fonts-liberation fonts-freefont-ttf xvfb \
+  libasound2 libatk-bridge2.0-0 libatk1.0-0 libatspi2.0-0 \
+  libcups2 libdbus-1-3 libdrm2 libgbm1 libgtk-3-0 \
+  libnspr4 libnss3 libxcomposite1 libxdamage1 \
+  libxfixes3 libxkbcommon0 libxrandr2 libxshmfence1 libxss1 \
+  xdg-utils
+
+# Clone and install Reader
+git clone https://github.com/vakra-dev/reader.git
+cd reader
+npm install
+npm run build
+
+# Run the daemon
+node dist/cli/index.js start --pool-size 5
+
+# Or embed in your own Node app (recommended for servers)
+npm install @vakra-dev/reader
+```
+
+### Run as a systemd service
+
+Create `/etc/systemd/system/reader.service`:
+
+```ini
+[Unit]
+Description=Reader scraping daemon
+After=network.target
+
+[Service]
+Type=simple
+User=reader
+WorkingDirectory=/opt/reader
+ExecStart=/usr/bin/node /opt/reader/dist/cli/index.js start --pool-size 5
+Restart=on-failure
+RestartSec=10
+Environment=NODE_ENV=production
+
+[Install]
+WantedBy=multi-user.target
+```
+
+Enable and start:
+
+```bash
+sudo systemctl enable reader
+sudo systemctl start reader
+sudo systemctl status reader
+```
+
+## Production tuning
+
+### Memory
+
+Each browser instance uses 300-500 MB. Plan for:
+- `size: 5` - 2-3 GB RAM headroom
+- `size: 10` - 4-6 GB RAM headroom
+- `size: 20` - 8-12 GB RAM headroom
+
+Leave 2 GB free for the Node process, OS, and buffers.
+
+### Monitoring
+
+Expose `PoolStats` via a `/health` endpoint in your app. Watch for:
+- `queueLength > 0 sustained` → scale up
+- `unhealthy > 0 sustained` → something is causing browser crashes
+- `avgRequestDuration` climbing → target sites changed, retries are kicking in
+
+### Graceful shutdown
+
+In Node apps, always close the client on shutdown:
+
+```javascript
+process.on("SIGTERM", async () => {
+  await reader.close();
+  process.exit(0);
+});
+```
+
+Reader has auto-cleanup registered too, but explicit is safer under systemd and container orchestrators.
+
+## Where to go next
+
+<CardGroup cols={2}>
+  <Card title="Browser Pool" icon="boxes-stacked" href="/self-hosted/concepts/browser-pool">
+    Tune pool size for your workload.
+  </Card>
+  <Card title="Proxy Configuration" icon="network-wired" href="/self-hosted/guides/proxy-configuration">
+    Add proxy rotation for production scraping.
+  </Card>
+</CardGroup>

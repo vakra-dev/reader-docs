@@ -1,0 +1,8 @@
+---
+title: "Retry failed URLs"
+openapi: "openapi.json POST /v1/jobs/{id}/retry"
+---
+
+Re-queues just the URLs in the job that errored. Successful results stay put.
+
+Returns `400 invalid_request` if the job has no failed URLs. The job status goes back to `queued` and processing resumes.

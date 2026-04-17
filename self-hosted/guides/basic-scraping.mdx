@@ -1,0 +1,140 @@
+---
+title: "Basic Scraping"
+description: "Practical recipes for single-URL and small-batch scrapes."
+---
+
+This guide covers the 80% case: you have a URL (or a handful of URLs), you want the markdown, and you want it fast.
+
+## Single URL, markdown output
+
+```javascript
+import { ReaderClient } from "@vakra-dev/reader";
+
+const reader = new ReaderClient();
+
+const result = await reader.scrape({
+  urls: ["https://example.com"],
+  formats: ["markdown"],
+});
+
+console.log(result.data[0].markdown);
+
+await reader.close();
+```
+
+The response shape is always `result.data[]` - even for a single URL you get an array. The array length matches the number of URLs you passed.
+
+## Markdown + HTML
+
+Request both formats in one call:
+
+```javascript
+const result = await reader.scrape({
+  urls: ["https://example.com"],
+  formats: ["markdown", "html"],
+});
+
+const page = result.data[0];
+console.log("Markdown:", page.markdown?.length, "chars");
+console.log("HTML:    ", page.html?.length, "chars");
+```
+
+Each format field is optional - only present if you asked for it.
+
+## Access metadata
+
+Every scrape includes rich metadata regardless of format:
+
+```javascript
+const page = result.data[0];
+
+console.log({
+  title:       page.metadata.website.title,
+  description: page.metadata.website.description,
+  author:      page.metadata.website.author,
+  canonical:   page.metadata.website.canonical,
+  ogImage:     page.metadata.website.openGraph?.image,
+  statusCode:  page.metadata.statusCode,
+  engine:      page.metadata.engine,     // which engine won the race
+  duration:    page.metadata.duration,   // ms
+});
+```
+
+This is how you get title/description/OG tags without a separate parse.
+
+## Disable main content extraction
+
+By default Reader extracts only the main content. To capture the full page (including nav and footer):
+
+```javascript
+await reader.scrape({
+  urls: ["https://example.com"],
+  onlyMainContent: false,
+});
+```
+
+Use this when you're scraping a landing page or when the `<main>` detection isn't picking up the right container.
+
+## Include/exclude selectors
+
+For fine-grained control, pass CSS selectors:
+
+```javascript
+await reader.scrape({
+  urls: ["https://blog.example.com/post"],
+  includeTags: [".article-content", "#main-body"],
+  excludeTags: [".comments", ".related-posts"],
+});
+```
+
+`includeTags` runs first (keep only these), then `excludeTags` (remove these from what's left).
+
+## Wait for dynamic content
+
+If a page uses JavaScript to render content after load, tell Reader to wait:
+
+```javascript
+await reader.scrape({
+  urls: ["https://spa.example.com/dashboard"],
+  waitForSelector: ".dashboard-loaded",
+  timeoutMs: 45000,
+});
+```
+
+`waitForSelector` tells Reader to wait until the specified CSS selector appears in the DOM before extracting content. Useful for SPAs that hydrate content client-side after the initial page load.
+
+## Reuse the client
+
+Create one `ReaderClient` at startup and reuse it for every request. Don't create-and-close per scrape - that defeats the browser pool:
+
+```javascript
+// ✅ Good - pool stays warm
+const reader = new ReaderClient({ browserPool: { size: 5 } });
+
+for (const url of urls) {
+  const result = await reader.scrape({ urls: [url] });
+  // handle result
+}
+
+await reader.close();
+```
+
+```javascript
+// ❌ Bad - spins up and tears down a browser pool for every URL
+for (const url of urls) {
+  const reader = new ReaderClient();
+  await reader.scrape({ urls: [url] });
+  await reader.close();
+}
+```
+
+## Where to go next
+
+<CardGroup cols={2}>
+  <Card title="Batch Scraping" icon="layer-group" href="/self-hosted/guides/batch-scraping">
+    Scrape many URLs in parallel with progress tracking.
+  </Card>
+  <Card title="Website Crawling" icon="sitemap" href="/self-hosted/guides/website-crawling">
+    Discover and scrape every page on a domain.
+  </Card>
+</CardGroup>

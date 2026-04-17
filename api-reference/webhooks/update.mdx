@@ -1,0 +1,6 @@
+---
+title: "Update a webhook"
+openapi: "openapi.json PATCH /v1/webhooks/{id}"
+---
+
+Patch any subset of a webhook's fields: `url`, `name`, `events`, `headers`, or `active`. The secret cannot be updated through this endpoint; delete and recreate the webhook if you need to rotate it.

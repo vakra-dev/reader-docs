@@ -1,0 +1,91 @@
+---
+title: "Daemon Mode"
+description: "Run Reader as a long-lived background process with a shared browser pool."
+---
+
+Every time you invoke `reader scrape` or `reader crawl`, Reader normally spins up a fresh browser pool, runs your command, and tears it down. That's fine for one-off scripts but wasteful when you're making many calls - you pay the 1-2 second pool startup cost every time.
+
+Daemon mode fixes this. Start a background daemon once, and all subsequent CLI commands auto-attach to it, reusing the warm pool.
+
+## Start the daemon
+
+```bash
+reader start --pool-size 5
+```
+
+This starts a background process listening on port 4000 (default) with a 5-instance browser pool. The first CLI command will feel instant - no startup cost.
+
+Optional flags:
+
+| Flag | Purpose |
+|---|---|
+| `--pool-size <n>` | Browser pool size (default: 5) |
+| `--port <n>` | Listen port (default: 4000) |
+| `--show-chrome` | Show browser windows (debugging) |
+| `-v, --verbose` | Enable logging |
+
+## Check status
+
+```bash
+reader status
+```
+
+Reports whether the daemon is running, its pool size, and the number of in-flight requests.
+
+## Use the daemon transparently
+
+Once the daemon is running, just use `reader scrape` and `reader crawl` as normal:
+
+```bash
+# First call - attaches to daemon automatically
+reader scrape https://example.com
+
+# Second call - also uses the daemon, instant startup
+reader scrape https://another.com
+```
+
+The CLI auto-detects a running daemon on the default port. To use a custom port:
+
+```bash
+reader start --port 5000
+reader scrape -p 5000 https://example.com
+```
+
+## Bypass the daemon
+
+For one-off runs where you don't want to touch the daemon (e.g., you want to test without affecting the shared pool):
+
+```bash
+reader scrape --standalone https://example.com
+```
+
+This runs in standalone mode regardless of whether a daemon is running.
+
+## Stop the daemon
+
+```bash
+reader stop
+```
+
+## When to use daemon mode
+
+- **Shell scripts** that run Reader many times in sequence
+- **Development** where you're iterating on CLI commands
+- **Cron jobs** that fire frequently (keep the daemon warm rather than cold-start on every run)
+
+## When not to use it
+
+- **Single one-off commands** - the daemon startup cost exceeds the savings
+- **CI/CD** - each build should be stateless; just use `--standalone` or skip daemon entirely
+- **Server applications** - embed `ReaderClient` directly in your Node app instead; the CLI daemon is for terminal workflows
+
+## Where to go next
+
+<CardGroup cols={2}>
+  <Card title="CLI guide" icon="terminal" href="/self-hosted/guides/cli">
+    Commands and flags for scrape and crawl.
+  </Card>
+  <Card title="Deployment" icon="server" href="/self-hosted/guides/deployment">
+    Running Reader as a production service.
+  </Card>
+</CardGroup>

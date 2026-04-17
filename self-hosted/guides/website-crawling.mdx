@@ -1,0 +1,147 @@
+---
+title: "Website Crawling"
+description: "Discover and scrape every page on a site with BFS link discovery."
+---
+
+Use `crawl()` when you don't know the exact URLs you want - you just know the entry point and want Reader to discover everything reachable from there.
+
+## Discover links only
+
+```javascript
+const result = await reader.crawl({
+  url: "https://docs.example.com",
+  depth: 2,
+  maxPages: 50,
+});
+
+console.log(`Found ${result.urls.length} pages:`);
+for (const page of result.urls) {
+  console.log(`  ${page.url} - ${page.title}`);
+}
+```
+
+You get back `{ url, title, description }` for every discovered page. No content scraping - just link discovery. Fast and cheap.
+
+## Crawl and scrape in one call
+
+Set `scrape: true` to scrape every discovered page:
+
+```javascript
+const result = await reader.crawl({
+  url: "https://docs.example.com",
+  depth: 2,
+  maxPages: 50,
+  scrape: true,
+  scrapeConcurrency: 3,
+  formats: ["markdown"],
+});
+
+console.log(`Discovered: ${result.urls.length}`);
+console.log(`Scraped:    ${result.scraped?.batchMetadata.successfulUrls}`);
+
+// All scraped markdown is in result.scraped.data
+for (const page of result.scraped?.data ?? []) {
+  console.log(`## ${page.metadata.website.title}\n`);
+  console.log(page.markdown);
+}
+```
+
+## Scope the crawl with patterns
+
+By default, crawling is same-domain. To further scope, use `includePatterns` and `excludePatterns`:
+
+```javascript
+// Only crawl /api/* subtree
+await reader.crawl({
+  url: "https://docs.example.com",
+  depth: 5,
+  maxPages: 200,
+  includePatterns: ["^https://docs\\.example\\.com/api/"],
+});
+
+// Exclude archived content
+await reader.crawl({
+  url: "https://blog.example.com",
+  depth: 3,
+  maxPages: 100,
+  excludePatterns: ["/archive/", "/tag/", "/author/"],
+});
+```
+
+Patterns are JavaScript regex strings. A URL is included if it matches at least one `includePatterns` entry (or if `includePatterns` is empty) and matches no `excludePatterns` entry.
+
+## Depth vs max pages
+
+Both `depth` and `maxPages` bound the crawl. Whichever triggers first stops it.
+
+| Setting | Effect |
+|---|---|
+| `depth: 1` | Only the seed URL's direct links |
+| `depth: 2` | Seed + direct links + their direct links |
+| `depth: 5` | Deep exploration |
+| `maxPages: 20` | Hard stop after 20 pages regardless of depth |
+
+For typical docs sites, `depth: 3, maxPages: 100` covers most content. For large sites, tune `maxPages` to your credit/time budget.
+
+## Rate limiting
+
+Reader rate-limits crawls with `delayMs` (default 1000ms):
+
+```javascript
+await reader.crawl({
+  url: "https://example.com",
+  depth: 3,
+  maxPages: 50,
+  delayMs: 2000, // be nicer to the target
+});
+```
+
+The delay is between sequential requests. If `scrape: true` with `scrapeConcurrency > 1`, the delay still applies - scrapes inside a crawl serialize behind the crawl delay.
+
+## Sticky proxy per crawl
+
+When you've configured proxy pools, Reader picks **one proxy at the start of the crawl** and uses it for every request. This is intentional - rotating IPs mid-crawl looks unnatural to anti-bot systems.
+
+If you want different crawl sessions on different proxies, just call `crawl()` multiple times. Each call picks a fresh proxy.
+
+## Resuming a crawl
+
+Reader's crawl is stateless - if it fails partway through, you can't resume from where it left off. For long crawls, consider:
+
+1. Running multiple smaller crawls with different seed URLs
+2. Using `crawl()` for discovery only (fast), then `scrape()` with the resulting URL list (resumable by chunking)
+
+```javascript
+// Step 1: discover
+const discovery = await reader.crawl({
+  url: "https://docs.example.com",
+  depth: 5,
+  maxPages: 500,
+});
+
+// Save the URL list
+const urls = discovery.urls.map(u => u.url);
+await fs.writeFile("urls.json", JSON.stringify(urls));
+
+// Step 2: scrape in chunks (resumable)
+const chunks = chunk(urls, 50);
+for (let i = 0; i < chunks.length; i++) {
+  if (await alreadyProcessed(i)) continue;
+  const result = await reader.scrape({
+    urls: chunks[i],
+    batchConcurrency: 5,
+  });
+  await saveResults(i, result);
+}
+```
+
+## Where to go next
+
+<CardGroup cols={2}>
+  <Card title="Crawling concept" icon="sitemap" href="/self-hosted/concepts/crawling">
+    How BFS discovery works under the hood.
+  </Card>
+  <Card title="CrawlOptions reference" icon="book" href="/self-hosted/api-reference/crawl-options">
+    Every option, every default.
+  </Card>
+</CardGroup>

@@ -1,0 +1,135 @@
+---
+title: "ReaderClient"
+description: "Constructor, options, methods, and lifecycle for the main Reader API."
+---
+
+`ReaderClient` is the high-level API you'll use for 99% of self-hosted Reader workloads. It owns the HeroCore instance and the browser pool, exposes `scrape()` and `crawl()`, and handles lazy initialization.
+
+## Constructor
+
+```typescript
+new ReaderClient(options?: ReaderClientOptions)
+```
+
+The constructor does **not** touch the browser. It only stores configuration. Initialization happens lazily on the first `scrape()` or `crawl()` call.
+
+## ReaderClientOptions
+
+```typescript
+interface ReaderClientOptions {
+  verbose?: boolean;
+  showChrome?: boolean;
+  browserPool?: BrowserPoolConfig;
+  proxies?: ProxyConfig[];
+  proxyPools?: ProxyPoolConfig;
+  proxyRotation?: "round-robin" | "random";
+  skipTLSVerification?: boolean;
+}
+```
+
+| Option | Type | Default | Description |
+|---|---|---|---|
+| `verbose` | `boolean` | `false` | Enable Pino logging |
+| `showChrome` | `boolean` | `false` | Show the browser window (debugging) |
+| `browserPool` | `BrowserPoolConfig` | `{ size: 2 }` | Browser pool configuration |
+| `proxies` | `ProxyConfig[]` | - | Flat proxy list for round-robin rotation |
+| `proxyPools` | `ProxyPoolConfig` | - | Multi-tier proxy pools (datacenter, residential) |
+| `proxyRotation` | `"round-robin" \| "random"` | `"round-robin"` | Rotation strategy within a pool |
+| `skipTLSVerification` | `boolean` | `true` | Skip TLS certificate verification |
+
+See [BrowserPoolConfig](/self-hosted/concepts/browser-pool) and [ProxyConfig](/self-hosted/concepts/proxy-tiers) for the nested types.
+
+## Methods
+
+```typescript
+async start(): Promise<void>
+```
+
+Pre-warm the client. Initializes HeroCore and the browser pool without running a scrape. Optional - `scrape()` and `crawl()` will initialize automatically if you haven't called `start()`.
+
+```typescript
+async scrape(options: ScrapeOptions): Promise<ScrapeResult>
+```
+
+Scrape one or more URLs. See [ScrapeOptions](/self-hosted/api-reference/scrape-options) and [ScrapeResult](/self-hosted/api-reference/scrape-result).
+
+```typescript
+async crawl(options: CrawlOptions): Promise<CrawlResult>
+```
+
+Discover and optionally scrape pages on a site. See [CrawlOptions](/self-hosted/api-reference/crawl-options) and [CrawlResult](/self-hosted/api-reference/crawl-result).
+
+```typescript
+isReady(): boolean
+```
+
+Returns `true` if the client has been initialized (via `start()` or a prior `scrape()`/`crawl()` call).
+
+```typescript
+async close(): Promise<void>
+```
+
+Shut down browsers and release resources. Auto-runs on process exit - call explicitly for fast cleanup.
+
+```typescript
+hasProxyTier(tier: "datacenter" | "residential"): boolean
+getProxyForTier(tier: "datacenter" | "residential"): ProxyConfig | undefined
+```
+
+Helpers for checking proxy pool availability. Useful when you want to gate behavior on whether a residential pool is configured.
+
+## Lifecycle
+
+ReaderClient is lazy by design:
+
+1. `new ReaderClient()` - constructor does nothing expensive
+2. First call to `scrape()` or `crawl()` - triggers HeroCore startup and browser pool initialization (1-2 seconds)
+3. Subsequent calls - reuse the warm pool
+4. Auto cleanup on `SIGTERM`/`SIGINT`/process exit
+5. Explicit `close()` - tears down browsers immediately
+
+Reuse a single client instance for the lifetime of your process. Don't create-and-close per request.
+
+## Server pattern
+
+```javascript
+import { ReaderClient } from "@vakra-dev/reader";
+import express from "express";
+
+const reader = new ReaderClient({
+  browserPool: { size: 5 },
+});
+
+const app = express();
+app.use(express.json());
+
+app.post("/scrape", async (req, res) => {
+  try {
+    const result = await reader.scrape({
+      urls: [req.body.url],
+      formats: ["markdown"],
+    });
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+process.on("SIGTERM", async () => {
+  await reader.close();
+  process.exit(0);
+});
+
+app.listen(3001);
+```
+
+## Where to go next
+
+<CardGroup cols={2}>
+  <Card title="scrape()" icon="file-lines" href="/self-hosted/api-reference/scrape">
+    Signature, options, and return type.
+  </Card>
+  <Card title="crawl()" icon="sitemap" href="/self-hosted/api-reference/crawl">
+    Signature, options, and return type.
+  </Card>
+</CardGroup>

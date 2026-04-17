@@ -1,0 +1,135 @@
+---
+title: "Reader as an agent tool"
+description: "Expose Reader via LLM tool calling so your agent can fetch pages on demand."
+---
+
+Modern LLMs can use tools. Give them Reader as a tool and they can read the web in the middle of a conversation: fetch a URL the user mentions, cite a source, follow a link from a search result, quote an article back to the user.
+
+## The tool definition
+
+Define a `read_url` tool that wraps `POST /v1/read`:
+
+```ts
+const tools = [
+  {
+    name: "read_url",
+    description:
+      "Fetch the content of a webpage as clean markdown. Use this when the user asks about a URL, links to an article, or refers to something you need to verify on the web.",
+    input_schema: {
+      type: "object",
+      properties: {
+        url: {
+          type: "string",
+          description: "The URL to read",
+        },
+      },
+      required: ["url"],
+    },
+  },
+];
+```
+
+Claude and GPT both use the same tool definition shape (with minor field-name differences). Adapt as needed for your SDK.
+
+## Handling the tool call
+
+```ts
+import Anthropic from "@anthropic-ai/sdk";
+import { ReaderClient } from "@vakra-dev/reader-js";
+
+const anthropic = new Anthropic();
+const reader = new ReaderClient({ apiKey: process.env.READER_KEY! });
+
+async function runAgent(userMessage: string) {
+  const messages: any[] = [{ role: "user", content: userMessage }];
+
+  while (true) {
+    const response = await anthropic.messages.create({
+      model: "claude-opus-4-6",
+      max_tokens: 2048,
+      tools,
+      messages,
+    });
+
+    if (response.stop_reason === "end_turn") {
+      return response.content.find((c: any) => c.type === "text")?.text ?? "";
+    }
+
+    if (response.stop_reason === "tool_use") {
+      messages.push({ role: "assistant", content: response.content });
+
+      const toolUseBlocks = response.content.filter((c: any) => c.type === "tool_use");
+      const toolResults = await Promise.all(
+        toolUseBlocks.map(async (block: any) => {
+          if (block.name === "read_url") {
+            try {
+              const result = await reader.read({ url: block.input.url });
+              if (result.kind === "scrape") {
+                return {
+                  type: "tool_result",
+                  tool_use_id: block.id,
+                  content: result.data.markdown ?? "",
+                };
+              }
+            } catch (err: any) {
+              return {
+                type: "tool_result",
+                tool_use_id: block.id,
+                content: `Error fetching URL: ${err.message}`,
+                is_error: true,
+              };
+            }
+          }
+          return {
+            type: "tool_result",
+            tool_use_id: block.id,
+            content: "Unknown tool",
+            is_error: true,
+          };
+        }),
+      );
+
+      messages.push({ role: "user", content: toolResults });
+      continue;
+    }
+
+    return "";
+  }
+}
+```
+
+## Token management
+
+Scrape results can be long. 20,000 tokens of markdown is not unusual for a big article. Shoving that into tool results can blow your context window:
+
+- **Truncate long results.** Cut at 8,000 tokens and append "... [content truncated]". The agent can request further reads or ask a refined question.
+- **Summarize in a sub-call.** Run the scrape result through a cheap summarization call before returning it to the main agent.
+- **Return only what was asked for.** If the user asked "what's the price?", the tool can extract just the price from the markdown rather than passing the whole page.
+
+## Errors as tool results
+
+Don't throw from inside the tool handler; return a string error as the tool result. The agent can see the failure and react ("I couldn't read that URL, let me try another source") instead of the whole turn crashing.
+
+## Rate limits
+
+LLM agents are prone to calling tools in a loop: "read this, then read that, then read something else". Each call is one Reader request. Watch your rate limit and add a cap:
+
+```ts
+const MAX_READS_PER_TURN = 5;
+let readCount = 0;
+
+// Inside the tool handler:
+if (readCount >= MAX_READS_PER_TURN) {
+  return {
+    type: "tool_result",
+    content: "Read limit reached for this turn",
+    is_error: true,
+  };
+}
+readCount += 1;
+```
+
+## Next
+
+- [Feeding Reader to an LLM](/home/guides/llm/llm-pipeline)
+- [Structured data extraction](/home/guides/llm/structured-data)

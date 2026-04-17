@@ -1,0 +1,164 @@
+---
+title: "Verifying webhook signatures"
+description: "HMAC-SHA256 verification for Express, FastAPI, and Next.js."
+---
+
+Reader signs every webhook delivery with HMAC-SHA256 when you provide a `secret`. Verify the signature before trusting the payload. Without verification, anyone who guesses your endpoint URL can forge events.
+
+## The signing scheme
+
+Reader computes:
+
+```
+signature = "sha256=" + hex(HMAC_SHA256(secret, `${timestamp}.${body}`))
+```
+
+And sends both the signature and the timestamp as headers:
+
+```
+X-Reader-Signature: sha256=abc123def456...
+X-Reader-Timestamp: 1712275200
+```
+
+Your job: reconstruct the same HMAC with the same inputs and check they match in constant time.
+
+## Node.js / Express
+
+Use `express.raw()` for the webhook route. You **must** have the unparsed bytes to hash.
+
+```ts
+import express from "express";
+import crypto from "crypto";
+
+const app = express();
+
+app.post(
+  "/hooks/reader",
+  express.raw({ type: "application/json" }),
+  (req, res) => {
+    const signature = req.headers["x-reader-signature"] as string;
+    const timestamp = req.headers["x-reader-timestamp"] as string;
+    const body = req.body as Buffer; // raw bytes
+
+    // 1. Replay protection: reject timestamps older than 5 minutes
+    const age = Math.floor(Date.now() / 1000) - parseInt(timestamp, 10);
+    if (Number.isNaN(age) || age > 300) {
+      return res.status(400).send("stale");
+    }
+
+    // 2. Recompute the signature
+    const expected =
+      "sha256=" +
+      crypto
+        .createHmac("sha256", process.env.READER_WEBHOOK_SECRET!)
+        .update(`${timestamp}.${body.toString("utf8")}`)
+        .digest("hex");
+
+    // 3. Constant-time compare
+    const a = Buffer.from(signature);
+    const b = Buffer.from(expected);
+    if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) {
+      return res.status(401).send("invalid signature");
+    }
+
+    // Good: parse the body now
+    const payload = JSON.parse(body.toString("utf8"));
+    handleEvent(req.headers["x-reader-event"] as string, payload);
+
+    res.status(200).end();
+  },
+);
+```
+
+## Python / FastAPI
+
+```python
+import hmac
+import hashlib
+import os
+import time
+
+from fastapi import FastAPI, Request, HTTPException
+
+app = FastAPI()
+SECRET = os.environ["READER_WEBHOOK_SECRET"].encode()
+
+
+@app.post("/hooks/reader")
+async def reader_webhook(request: Request):
+    body = await request.body()  # raw bytes
+    signature = request.headers.get("x-reader-signature", "")
+    timestamp = request.headers.get("x-reader-timestamp", "")
+
+    # 1. Replay protection
+    try:
+        age = int(time.time()) - int(timestamp)
+    except ValueError:
+        raise HTTPException(400, "bad timestamp")
+    if age > 300:
+        raise HTTPException(400, "stale timestamp")
+
+    # 2. Recompute
+    expected = (
+        "sha256="
+        + hmac.new(SECRET, f"{timestamp}.{body.decode()}".encode(), hashlib.sha256).hexdigest()
+    )
+
+    # 3. Constant-time compare
+    if not hmac.compare_digest(signature, expected):
+        raise HTTPException(401, "invalid signature")
+
+    import json
+    payload = json.loads(body)
+    handle_event(request.headers["x-reader-event"], payload)
+    return {"ok": True}
+```
+
+## Next.js (App Router)
+
+```ts
+// app/api/hooks/reader/route.ts
+import crypto from "crypto";
+import { NextRequest, NextResponse } from "next/server";
+
+export async function POST(req: NextRequest) {
+  const body = await req.text(); // raw body as a string
+  const signature = req.headers.get("x-reader-signature") ?? "";
+  const timestamp = req.headers.get("x-reader-timestamp") ?? "";
+
+  const age = Math.floor(Date.now() / 1000) - parseInt(timestamp, 10);
+  if (Number.isNaN(age) || age > 300) {
+    return new NextResponse("stale", { status: 400 });
+  }
+
+  const expected =
+    "sha256=" +
+    crypto
+      .createHmac("sha256", process.env.READER_WEBHOOK_SECRET!)
+      .update(`${timestamp}.${body}`)
+      .digest("hex");
+
+  const a = Buffer.from(signature);
+  const b = Buffer.from(expected);
+  if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) {
+    return new NextResponse("invalid signature", { status: 401 });
+  }
+
+  const payload = JSON.parse(body);
+  // ... handle event ...
+
+  return NextResponse.json({ ok: true });
+}
+```
+
+## Common pitfalls
+
+- **Parsing the JSON before hashing.** If you `JSON.parse` then re-stringify, the bytes won't match what Reader signed. Always use the raw body.
+- **Missing `express.raw()`.** Express's default JSON middleware parses the body and loses the original bytes. The webhook route needs a separate middleware.
+- **String comparison instead of constant-time compare.** A `===` comparison leaks timing information. Use `crypto.timingSafeEqual` (Node) or `hmac.compare_digest` (Python).
+- **No replay check.** A captured webhook can be replayed by an attacker unless you reject stale timestamps.
+
+## Next
+
+- [Webhook workflows](/home/guides/async-workflows/webhook-workflows)
+- [Webhook retries](/home/guides/async-workflows/webhook-retries)

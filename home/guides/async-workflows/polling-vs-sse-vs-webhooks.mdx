@@ -1,0 +1,94 @@
+---
+title: "Polling vs SSE vs webhooks"
+description: "The same job can be watched three ways. Which one fits your use case?"
+---
+
+All three work. Picking the right one depends less on Reader and more on where your code runs.
+
+## The short version
+
+| Your code is... | Use |
+| --- | --- |
+| A one-off script or CLI | **Polling** |
+| A web UI showing live progress | **SSE** |
+| A backend service / worker | **Webhooks** |
+| A serverless function | **Webhooks** |
+| A mobile app | **Polling** or **SSE** depending on the use case |
+
+## The long version
+
+### Polling
+
+You call `GET /v1/jobs/{id}` on a loop until the status is terminal.
+
+**Good:**
+- Simple: no new concepts
+- No infrastructure needed
+- Works from anywhere that can make HTTP requests
+- Debuggable: you can `curl` the same endpoint
+
+**Bad:**
+- Eats your rate limit on long jobs
+- Wastes requests between page completions
+- Latency: you find out about completion at your poll interval, not instantly
+
+**Best for:** CLI tools, Jupyter notebooks, one-off scripts, small batches.
+
+### Server-Sent Events (SSE)
+
+You open a single HTTP connection to `/v1/jobs/{id}/stream` (or `/v1/events` workspace-wide) and receive events as they happen.
+
+**Good:**
+- Real-time updates with no polling overhead
+- Efficient: one connection per job instead of many requests
+- Natural fit for live UIs
+
+**Bad:**
+- Requires a long-lived connection, which fights with serverless
+- One connection per job you're watching (unless you use the workspace stream)
+- If your client restarts, you lose progress visibility mid-stream
+
+**Best for:** Web dashboards, progress bars, CLI tools that want low-latency output, anything with a human watching.
+
+### Webhooks
+
+You register an HTTPS endpoint and Reader POSTs you a payload when events fire.
+
+**Good:**
+- Zero overhead: you do nothing until the event fires
+- Works even if your code was offline when the job ran
+- One webhook can serve every job in your workspace
+- Perfect for serverless, queue workers, backend services
+
+**Bad:**
+- Needs a public HTTPS endpoint
+- Needs signature verification to be safe
+- Deliveries can be retried, so you need idempotency
+- Debugging is harder than polling (you can't `curl` an incoming webhook)
+
+**Best for:** Backend workflows, serverless, anything where jobs outlive the process that created them.
+
+## Combining patterns
+
+You can use more than one. A common setup:
+
+- **Webhook** as the authoritative "job done" signal that kicks off downstream work
+- **Polling or SSE** in a UI so the user can watch progress while the webhook handles the side effects
+
+Your webhook handler writes the results to your database. Your UI reads from your database (not from Reader) after the webhook fires. This keeps Reader out of your UI's critical path.
+
+## Cost of each pattern
+
+| Pattern | Credit cost | Rate limit cost |
+| --- | --- | --- |
+| Polling | 0 | High (counts toward RPM) |
+| SSE | 0 | Low (one connection doesn't count toward RPM) |
+| Webhooks | 0 | None |
+
+Polling is rate-limit-heavy in a way that can surprise you. See [the rate limits guide](/home/guides/production/rate-limits) for how to stay under your tier.
+
+## Next
+
+- [Webhook workflows](/home/guides/async-workflows/webhook-workflows)
+- [SSE streaming](/home/guides/async-workflows/sse-streaming)
+- [Polling a job](/home/guides/async-workflows/polling-jobs)

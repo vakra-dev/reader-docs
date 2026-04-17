@@ -1,0 +1,85 @@
+---
+title: "Authentication"
+description: "Every Reader API request is authenticated with an API key passed in the x-api-key header."
+---
+
+Reader uses API key authentication. Every request to `https://api.reader.dev/v1/*` must include a valid key in the `x-api-key` header.
+
+## Get an API key
+
+<Card title="Open Dashboard →" href="https://app.reader.dev" horizontal>
+  Sign up free at app.reader.dev. You get **1,000 credits every month** on the free tier - no credit card required.
+</Card>
+
+Inside the dashboard:
+
+1. Click **API Keys** in the sidebar
+2. Click **Create API Key** and give it a name
+3. Copy the key - it starts with `rdr_` and is shown **only once**
+
+<Warning>
+API keys are shown once at creation time. Store them securely (environment variables, a secrets manager) - never commit them to version control or expose them in client-side code.
+</Warning>
+
+## Using your key
+
+Pass the key in the `x-api-key` header on every request:
+
+<CodeGroup>
+
+```bash curl
+curl -X POST https://api.reader.dev/v1/read \
+  -H "Content-Type: application/json" \
+  -H "x-api-key: rdr_your_api_key" \
+  -d '{"url": "https://example.com"}'
+```
+
+```javascript JavaScript
+import { ReaderClient } from "@vakra-dev/reader-js";
+
+// The SDK handles the header for you
+const reader = new ReaderClient({
+  apiKey: process.env.READER_API_KEY,
+});
+```
+
+```python Python
+from reader_py import ReaderClient
+
+# The SDK handles the header for you
+reader = ReaderClient(api_key=os.environ["READER_API_KEY"])
+```
+
+</CodeGroup>
+
+## Managing keys
+
+All key management happens in the dashboard - not through the API. This is intentional: rotating, revoking, and creating keys is a privileged operation that shouldn't be scriptable from a compromised key.
+
+- **List keys** - API Keys page in the dashboard
+- **Create a new key** - Click "Create API Key"
+- **Revoke a key** - Click the trash icon next to any key
+- **Rotate a key** - Create a new one, update your app, then revoke the old one
+
+You can have up to **10 active keys per workspace**. Use separate keys for development, staging, and production so you can rotate them independently.
+
+## Error responses
+
+| Status | Meaning |
+|---|---|
+| `401 Unauthorized` | Missing, invalid, or revoked `x-api-key` header |
+| `402 Payment Required` | Key is valid but the workspace has run out of credits |
+| `403 Forbidden` | Key doesn't have permission for the requested resource |
+
+See the full [Errors](/home/concepts/errors) reference for status code details and retry guidance.
+
+## Where to go next
+
+<CardGroup cols={2}>
+  <Card title="Make your first request" icon="bolt" href="/home/quickstart">
+    60-second walkthrough from key creation to first scrape.
+  </Card>
+  <Card title="POST /v1/read" icon="code" href="/api-reference/read">
+    Full reference for the unified scrape/crawl/batch endpoint.
+  </Card>
+</CardGroup>

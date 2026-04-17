@@ -1,0 +1,84 @@
+---
+title: "Crawl + scrape in one call"
+description: "Discover links and fetch full page content in a single job."
+---
+
+When you crawl with Reader, every discovered page is automatically scraped too; you don't need a second pass. The resulting job's `results` array contains the markdown for every page the crawler found, the same way a batch scrape would.
+
+## What you get
+
+```ts
+const result = await client.read({
+  url: "https://docs.example.com",
+  maxDepth: 3,
+  maxPages: 100,
+});
+
+if (result.kind === "job") {
+  for (const page of result.data.results) {
+    console.log(page.url);
+    console.log(page.markdown?.slice(0, 200));
+    console.log("---");
+  }
+}
+```
+
+Each entry in `results[]` has the same shape as a sync scrape result: `url`, `markdown`, `html` (if requested), `metadata` with `title`, `statusCode`, `duration`, `scrapedAt`, and so on. You can hand the same handler function to batch and crawl results; they're interchangeable.
+
+## Extraction options apply to crawled pages
+
+The same extraction knobs work on crawl jobs:
+
+```ts
+await client.read({
+  url: "https://docs.example.com",
+  maxDepth: 3,
+  maxPages: 100,
+  onlyMainContent: true,       // default, strips nav/footer from every page
+  formats: ["markdown", "html"], // both formats for every page
+  excludeTags: [".edit-on-github", ".feedback-widget"],
+});
+```
+
+Reader applies these to every page it discovers during the crawl, useful when you know the site's template includes boilerplate on every page.
+
+## One credit per discovered page
+
+Crawl bills 1 credit per page flat, regardless of proxy mode. A 100-page crawl costs 100 credits. See [Credits and billing](/home/concepts/credits-and-billing).
+
+## Feeding a downstream pipeline
+
+A crawl + scrape result is a ready-made input for an LLM pipeline, a search index, or a static backup:
+
+```ts
+const crawled = await client.read({
+  url: "https://blog.example.com",
+  maxPages: 200,
+});
+
+if (crawled.kind === "job") {
+  for (const page of crawled.data.results) {
+    if (page.error) continue;
+    await vectorStore.upsert({
+      id: page.url,
+      text: page.markdown!,
+      metadata: { title: page.metadata?.title, scrapedAt: page.metadata?.scrapedAt },
+    });
+  }
+}
+```
+
+## Debugging an unexpected result
+
+A crawl result can surprise you:
+
+- **Too few pages.** `maxDepth` too shallow; links Reader can't find (JavaScript-rendered); same-host constraint excluded the pages you wanted.
+- **Too many pages.** `maxPages` too loose; site has unexpected link graph (e.g., calendar archives).
+- **Missing content on specific pages.** Extraction heuristics dropped something; use [include/exclude selectors](/home/guides/getting-started/selectors) to pin it.
+
+Start with a small pilot (`maxPages: 20`) to sanity-check the crawler's output before running a larger crawl.
+
+## Next
+
+- [Crawling a website](/home/guides/advanced/crawling)
+- [Reliable batch processing](/home/guides/async-workflows/reliable-batch)

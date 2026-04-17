@@ -1,0 +1,137 @@
+---
+title: "Error Handling"
+description: "Typed errors, proxy escalation, and what happens when a scrape fails."
+---
+
+Every failure in Reader surfaces as a typed error. This page covers the mental model; see [API Reference - Errors](/self-hosted/api-reference/errors) for the full class list.
+
+## Everything is typed
+
+All errors extend a base `ReaderError` class and carry:
+
+- **`code`** - a stable string like `TIMEOUT` or `NETWORK_ERROR`
+- **`message`** - human-readable description
+- **`retryable`** - a boolean telling you whether this is a transient failure worth retrying
+- **`url`** - the URL that failed (when applicable)
+- **`toJSON()`** - structured output for logging
+
+```javascript
+import { ReaderError } from "@vakra-dev/reader";
+
+try {
+  await reader.scrape({ urls: [...] });
+} catch (err) {
+  if (err instanceof ReaderError) {
+    console.error({
+      code: err.code,
+      retryable: err.retryable,
+      message: err.message,
+      url: err.url,
+    });
+  }
+}
+```
+
+## The retryable flag
+
+`retryable: true` means the error is transient and a retry with the same input might succeed. `retryable: false` means the error is terminal - retrying won't help.
+
+Examples of **retryable** errors:
+- `NETWORK_ERROR` - connection reset, socket error
+- `TIMEOUT` - page took too long to load
+- `PROXY_CONNECTION_ERROR` - proxy unreachable
+- `BOT_DETECTED` - might pass on retry with a different proxy
+- `EMPTY_CONTENT` - page might have been rate-limiting
+
+Examples of **non-retryable** errors:
+- `INVALID_URL` - malformed URL, not going to improve
+- `DNS_ERROR` - hostname doesn't exist
+- `ROBOTS_BLOCKED` - robots.txt forbids it
+- `ACCESS_DENIED` - 401/403 from the origin
+- `PROXY_EXHAUSTED` - all proxy tiers tried and failed
+- `VALIDATION_ERROR` - you passed bad options
+
+## Built-in proxy escalation
+
+Reader has a two-step retry per URL built in:
+
+1. **Datacenter attempt** (default 10s timeout) - try the URL with a fast, cheap datacenter proxy
+2. **Residential attempt** (remaining time up to 30s total) - if the first attempt fails for any reason, escalate to a residential proxy and try again
+3. **Done** - if both attempts fail, the URL is reported as failed
+
+Non-retryable errors (DNS failure, invalid URL, robots.txt) skip directly to failure without trying the second attempt.
+
+The timeouts are configurable per-request:
+
+```javascript
+await reader.scrape({
+  urls: [...],
+  hardDeadlineMs: 30000,       // total cap per URL (default: 30s)
+  datacenterTimeoutMs: 10000,  // first attempt timeout (default: 10s)
+});
+```
+
+## Error handling patterns
+
+### Simple try/catch
+
+For one-off scripts, wrap the call and log:
+
+```javascript
+try {
+  const result = await reader.scrape({ urls: [url] });
+  console.log(result.data[0].markdown);
+} catch (err) {
+  console.error(`Scrape failed: ${err.message}`);
+}
+```
+
+### Retry on retryable errors
+
+For production code, check the flag:
+
+```javascript
+async function scrapeWithRetry(url, maxAttempts = 3) {
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    try {
+      return await reader.scrape({ urls: [url] });
+    } catch (err) {
+      if (!err.retryable || attempt === maxAttempts - 1) {
+        throw err;
+      }
+      await new Promise(r => setTimeout(r, 1000 * Math.pow(2, attempt)));
+    }
+  }
+}
+```
+
+### Batch with partial failures
+
+When scraping many URLs, a batch can partially succeed. The result's `batchMetadata.errors` array tells you which URLs failed:
+
+```javascript
+const result = await reader.scrape({
+  urls: [url1, url2, url3, url4],
+  batchConcurrency: 2,
+});
+
+console.log(`Success: ${result.batchMetadata.successfulUrls}`);
+console.log(`Failed:  ${result.batchMetadata.failedUrls}`);
+
+for (const { url, error } of result.batchMetadata.errors ?? []) {
+  console.error(`  ${url}: ${error}`);
+}
+```
+
+The successful URLs still come back in `result.data`. Batch scraping never throws on individual URL failures - only on framework-level errors (browser pool exhausted, invalid options, etc.).
+
+## Where to go next
+
+<CardGroup cols={2}>
+  <Card title="Errors reference" icon="book" href="/self-hosted/api-reference/errors">
+    Full table of every error class and its code.
+  </Card>
+  <Card title="Scraping Engine" icon="layer-group" href="/self-hosted/concepts/engine-waterfall">
+    How the Hero engine and proxy escalation work.
+  </Card>
+</CardGroup>

@@ -1,0 +1,137 @@
+---
+title: "ScrapeResult"
+description: "Return type for scrape() - data array plus batch metadata."
+---
+
+## Top-level shape
+
+```typescript
+interface ScrapeResult {
+  data: WebsiteScrapeResult[];
+  batchMetadata: BatchMetadata;
+}
+```
+
+- `data` - one entry per **successful** URL. Failed URLs are not included here.
+- `batchMetadata` - aggregate stats for the batch, including errors.
+
+## WebsiteScrapeResult
+
+```typescript
+interface WebsiteScrapeResult {
+  rawHtml: string;     // always present — raw browser HTML before cleaning
+  markdown?: string;   // present if "markdown" in formats
+  html?: string;       // present if "html" in formats
+  metadata: {
+    baseUrl: string;
+    statusCode: number;
+    engine: "hero";
+    totalPages: number;
+    scrapedAt: string;   // ISO timestamp
+    duration: number;    // milliseconds
+    website: WebsiteMetadata;
+    proxy?: ProxyMetadata;
+  };
+}
+```
+
+| Field | Description |
+|---|---|
+| `rawHtml` | Raw HTML from the browser before any cleaning (always present) |
+| `markdown` | Cleaned markdown output (if `"markdown"` in formats) |
+| `html` | Cleaned HTML output (if `"html"` in formats) |
+| `metadata.baseUrl` | The original URL that was scraped |
+| `metadata.statusCode` | HTTP status returned by the server |
+| `metadata.engine` | Engine used (`"hero"`) |
+| `metadata.duration` | Total time in milliseconds |
+| `metadata.scrapedAt` | ISO timestamp when the scrape completed |
+| `metadata.website` | Parsed page metadata (title, OG tags, etc.) |
+| `metadata.proxy` | Proxy used (if any) |
+
+## WebsiteMetadata
+
+```typescript
+interface WebsiteMetadata {
+  title: string | null;
+  description: string | null;
+  author: string | null;
+  language: string | null;
+  charset: string | null;
+  favicon: string | null;
+  image: string | null;
+  canonical: string | null;
+  keywords: string[] | null;
+  robots: string | null;
+  themeColor: string | null;
+  openGraph?: {
+    title: string | null;
+    description: string | null;
+    type: string | null;
+    url: string | null;
+    image: string | null;
+    siteName: string | null;
+    locale: string | null;
+  } | null;
+  twitter?: {
+    card: string | null;
+    site: string | null;
+    creator: string | null;
+    title: string | null;
+    description: string | null;
+    image: string | null;
+  } | null;
+}
+```
+
+## BatchMetadata
+
+```typescript
+interface BatchMetadata {
+  totalUrls: number;
+  successfulUrls: number;
+  failedUrls: number;
+  scrapedAt: string;       // ISO timestamp
+  totalDuration: number;   // milliseconds
+  errors?: Array<{ url: string; error: string }>;
+}
+```
+
+Use `batchMetadata.errors` to inspect which URLs failed and why. Successful URLs are in `data`, failed ones are only in `errors` - a batch scrape never rejects due to individual URL failures.
+
+## Example
+
+```javascript
+const result = await reader.scrape({
+  urls: ["https://example.com"],
+  formats: ["markdown"],
+});
+
+// {
+//   data: [
+//     {
+//       markdown: "# Example Domain\n\nThis domain is for use in...",
+//       metadata: {
+//         baseUrl: "https://example.com/",
+//         statusCode: 200,
+//         engine: "http",
+//         duration: 487,
+//         scrapedAt: "2026-04-04T12:00:00.000Z",
+//         website: {
+//           title: "Example Domain",
+//           description: null,
+//           canonical: null,
+//           openGraph: null,
+//           twitter: null
+//         }
+//       }
+//     }
+//   ],
+//   batchMetadata: {
+//     totalUrls: 1,
+//     successfulUrls: 1,
+//     failedUrls: 0,
+//     totalDuration: 487,
+//     scrapedAt: "2026-04-04T12:00:00.000Z"
+//   }
+// }
+```

@@ -1,0 +1,104 @@
+---
+title: "Webhook-driven workflows"
+description: "Trigger downstream work when a job completes: database writes, emails, re-indexing."
+---
+
+Webhooks turn Reader into an event source for your own systems. The typical shape: you start a job, Reader runs it, your endpoint gets a POST when it's done, and you trigger whatever comes next: write to a database, enqueue a reranking job, notify a user, invalidate a cache.
+
+## The end-to-end pattern
+
+```
+[Your service] ──POST /v1/read──▶ [Reader]
+                                      │
+                                      ▼  (runs scrape / crawl)
+                                      │
+[Your endpoint] ◀──webhook POST──[Reader]
+        │
+        ▼
+  Insert results into DB
+  Enqueue embed job
+  Mark source as "fetched"
+```
+
+The key insight: **your job creator and your job consumer can be different services, or even the same service across different process lifetimes**. As long as the webhook has somewhere to land, the work gets done.
+
+## Creating the webhook
+
+Do this once, ahead of time. Webhooks persist until you delete them.
+
+```ts
+await client.request("POST", "/v1/webhooks", {
+  url: "https://your-app.example.com/hooks/reader",
+  name: "Production batch completion",
+  events: ["job.completed", "job.failed"],
+  secret: process.env.READER_WEBHOOK_SECRET,
+});
+```
+
+## Kicking off a job
+
+```ts
+const { data: job } = await client.request("POST", "/v1/read", {
+  urls: loadUrlsFromDatabase(),
+});
+await saveJobToTrackingTable(job.id, "pending");
+```
+
+You track the job ID in your own database so when the webhook fires, you know which piece of work to resume.
+
+## Receiving the webhook
+
+```ts
+// Express-style handler
+app.post(
+  "/hooks/reader",
+  express.raw({ type: "application/json" }), // raw bytes for signature verification
+  async (req, res) => {
+    // 1. Verify signature (see Verifying webhooks guide)
+    verify(req, process.env.READER_WEBHOOK_SECRET!);
+
+    // 2. Idempotency: dedupe by delivery ID
+    const deliveryId = req.headers["x-reader-delivery"] as string;
+    if (await alreadyProcessed(deliveryId)) {
+      res.status(200).end();
+      return;
+    }
+
+    // 3. Handle the event
+    const event = req.headers["x-reader-event"];
+    const payload = JSON.parse(req.body.toString());
+
+    if (event === "job.completed") {
+      await handleJobComplete(payload);
+    } else if (event === "job.failed") {
+      await handleJobFailed(payload);
+    }
+
+    await markProcessed(deliveryId);
+    res.status(200).end();
+  },
+);
+```
+
+## What to do in `handleJobComplete`
+
+Don't do slow work inside the webhook handler. Reader retries if you don't respond within 10 seconds. Instead, enqueue the slow work and return 200 immediately.
+
+```ts
+async function handleJobComplete(payload) {
+  await jobQueue.push({ type: "process-scrape-results", jobId: payload.jobId });
+  // Return 200 quickly; a background worker fetches the results and processes them
+}
+```
+
+The background worker fetches the full results via `GET /v1/jobs/{id}` (paginated, so don't miss pages beyond the first one) and does whatever your pipeline needs: index into a vector store, run LLM extraction, persist to a database.
+
+## Idempotency is non-negotiable
+
+Reader may deliver the same event twice. If your endpoint times out but Reader eventually succeeds, it will retry, and the original delivery might still have been received. Always dedupe by `X-Reader-Delivery`, which is a unique UUID per delivery attempt.
+
+## Next
+
+- [Verifying webhooks](/home/guides/async-workflows/verifying-webhooks): verification code for Express, FastAPI, Next.js
+- [Webhook retries](/home/guides/async-workflows/webhook-retries): what to do when deliveries fail on your side
+- [Reliable batch scraping](/home/guides/async-workflows/reliable-batch): webhook + retry + idempotency end to end

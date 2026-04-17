@@ -1,94 +1,88 @@
 ---
-title: Introduction
-description: Open-source, production-grade web scraping engine built for LLMs
+title: "Introduction"
+description: "Reader turns any web page into clean, LLM-ready content."
 ---
 
-## The Problem
+Reader is a hosted API that turns any web page into clean, structured content - markdown, HTML, metadata, and extracted fields - ready to feed to LLMs, agents, and pipelines.
 
-Building agents that need web access is frustrating. You piece together Puppeteer, add stealth plugins, manage proxies, and it still breaks in production.
+One endpoint. One `x-api-key` header. You point it at a URL, we handle the rest:
 
-Because production-grade web scraping isn't about rendering a page and converting HTML to markdown. It's about everything underneath:
+- **Rendering** dynamic, JavaScript-heavy sites so you get the page the user sees
+- **Bypassing** bot walls automatically. Pick `standard`, `stealth`, or let `auto` decide
+- **Extracting** main content and stripping navigation, ads, and boilerplate
+- **Converting** to clean markdown optimized for language models
+- **Caching** successful scrapes for 24 hours, so repeat requests are free
 
-| Layer                    | What it actually takes                                          |
-| ------------------------ | --------------------------------------------------------------- |
-| **Browser architecture** | Managing browser instances at scale, not one-off scripts        |
-| **Anti-bot handling**    | JS challenges, Turnstile, and other protections                 |
-| **TLS fingerprinting**   | Real browsers have fingerprints. Puppeteer doesn't. Sites know. |
-| **Proxy infrastructure** | Datacenter vs residential, rotation strategies, sticky sessions |
-| **Resource management**  | Browser pooling, memory limits, graceful recycling              |
-| **Reliability**          | Rate limiting, retries, timeouts, graceful degradation          |
-
-## The Solution
-
-Two primitives. That's it.
-
-```typescript
-import { ReaderClient } from "@vakra-dev/reader";
-
-const reader = new ReaderClient();
-
-// Scrape URLs → clean markdown
-const result = await reader.scrape({ urls: ["https://example.com"] });
-console.log(result.data[0].markdown);
-
-// Crawl a site → discover + scrape pages
-const pages = await reader.crawl({
-  url: "https://example.com",
-  depth: 2,
-  scrape: true,
-});
-console.log(`Found ${pages.urls.length} pages`);
-```
-
-All the hard stuff (browser pooling, challenge detection, proxy rotation, retries) happens under the hood. You get clean markdown. Your agents get the web.
-
-## Features
+## What you can build
 
 <CardGroup cols={2}>
-  <Card title="Production-Grade" icon="bolt">
-    Built on Ulixee Hero with TLS fingerprinting and stealth browsing
+  <Card title="RAG pipelines" icon="database">
+    Scrape docs, blog posts, and knowledge bases into your vector store.
   </Card>
-  <Card title="Clean Output" icon="file-lines">
-    Markdown and HTML with automatic main content extraction
+  <Card title="AI agents" icon="robot">
+    Give your agent the ability to read the web as a tool call.
   </Card>
-  <Card title="Browser Pool" icon="layer-group">
-    Auto-recycling, health monitoring, and queue management
+  <Card title="Research tools" icon="magnifying-glass">
+    Batch scrape hundreds of URLs in parallel and stream results live.
   </Card>
-  <Card title="Website Crawling" icon="globe">
-    BFS link discovery with depth and page limits
-  </Card>
-  <Card title="Proxy Support" icon="shield">
-    Datacenter and residential proxies with rotation strategies
-  </Card>
-  <Card title="CLI Included" icon="terminal">
-    Use from command line or programmatically in your code
+  <Card title="Monitoring" icon="chart-line">
+    Crawl competitor sites and extract structured data on a schedule.
   </Card>
 </CardGroup>
 
-## Next Steps
+## Get started in 60 seconds
+
+<Steps>
+  <Step title="Sign up free">
+    Create an account at [app.reader.dev](https://app.reader.dev). No credit card required - you get **1,000 credits every month** on the free tier.
+  </Step>
+  <Step title="Grab your API key">
+    Open the API Keys page in the dashboard and click **Create API Key**. Copy it - you'll only see it once.
+  </Step>
+  <Step title="Make your first request">
+    Follow the [Quickstart](/home/quickstart) to scrape your first page in under a minute.
+  </Step>
+</Steps>
+
+<Card title="Open Dashboard →" href="https://app.reader.dev" horizontal>
+  Sign up free and create your API key in 30 seconds.
+</Card>
+
+## How Reader works
+
+Everything flows through a single endpoint: `POST /v1/read`.
+
+The shape of your request determines what Reader does:
+
+| Request | Mode | Response |
+|---|---|---|
+| Single `url` | **Scrape** | Synchronous - results returned immediately |
+| Array of `urls` | **Batch** | Asynchronous - returns a `jobId` to poll or stream |
+| `url` with `maxDepth` / `maxPages` | **Crawl** | Asynchronous - discovers links and scrapes each page |
+
+You don't pick the mode. Reader infers it from your input. See [The read primitive](/home/concepts/read-primitive) for the full mental model.
+
+## Why developers pick Reader
+
+- **One primitive, infinite shapes.** No separate endpoints for scrape, batch, crawl. One `read` call handles all three.
+- **Handles the modern web.** Dynamic pages render correctly, bot walls get bypassed automatically in `auto` mode, and you never touch the underlying infrastructure.
+- **Built for LLMs.** Output is clean markdown by default, with optional HTML and metadata. Main content extraction removes boilerplate so your tokens aren't wasted.
+- **Free tier is actually free.** 1,000 credits a month, no card required. Enough to build and ship a real prototype.
+- **Self-hostable.** The underlying engine is open source. Host it yourself if you need to. [Learn more →](/self-hosted)
+
+## Where to go next
 
 <CardGroup cols={2}>
-  <Card title="Quickstart" icon="rocket" href="/home/quickstart">
-    Get up and running in 5 minutes
+  <Card title="Quickstart" icon="bolt" href="/home/quickstart">
+    Make your first scrape in 60 seconds.
   </Card>
-  <Card
-    title="Scraping Guide"
-    icon="code"
-    href="/documentation/guides/basic-scraping"
-  >
-    Learn how to scrape URLs
+  <Card title="The read primitive" icon="lightbulb" href="/home/concepts/read-primitive">
+    Understand the mental model behind Reader's single endpoint.
   </Card>
-  <Card
-    title="Crawling Guide"
-    icon="spider"
-    href="/documentation/guides/website-crawling"
-  >
-    Learn how to crawl websites
+  <Card title="Guides" icon="book" href="/home/guides/getting-started/first-scrape">
+    Practical recipes for RAG, agents, production patterns, and more.
   </Card>
-  <Card title="Examples" icon="folder-open" href="/home/examples">
-    Ready-to-run examples with AI integrations and deployment guides
-  </Card>
-  <Card title="API Reference" icon="book" href="/api-reference/overview">
-    Full API documentation
+  <Card title="API Reference" icon="code" href="/api-reference/authentication">
+    Full API spec for every endpoint.
   </Card>
 </CardGroup>

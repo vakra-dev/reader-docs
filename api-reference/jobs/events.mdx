@@ -1,0 +1,20 @@
+---
+title: "Events stream (SSE)"
+openapi: "openapi.json GET /v1/events"
+---
+
+A single long-lived HTTP connection that emits Server-Sent Events for every job in your workspace as they make progress. Use it for dashboards and realtime UIs.
+
+## Event types
+
+| Event | Payload |
+| --- | --- |
+| `job:progress` | `{ jobId, status, completed, total }` |
+| `job:completed` | `{ jobId, status, completed, total, creditsUsed }` |
+| `job:failed` | `{ jobId, error }` |
+
+A keep-alive comment (`: ping`) is sent every 30 seconds so intermediate proxies don't close the connection as idle. Most SSE clients ignore comment frames automatically.
+
+For a stream scoped to a single job (with `progress`, `page`, `error`, and `done` events), use [`GET /v1/jobs/{id}/stream`](/api-reference/jobs/stream) instead.
+
+See [Events](/home/concepts/events) for the full concept guide.

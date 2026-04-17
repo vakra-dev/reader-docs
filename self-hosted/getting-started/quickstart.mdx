@@ -1,0 +1,105 @@
+---
+title: "Quickstart"
+description: "Make your first scrape with self-hosted Reader in 60 seconds."
+---
+
+By the end of this page you'll have scraped a real page with the self-hosted Reader library and seen clean markdown come back.
+
+## Install
+
+```bash
+npm install @vakra-dev/reader
+```
+
+Make sure you're on Node 22.12.0+ and have Chrome's system dependencies if you're on Linux. See [Installation](/self-hosted/getting-started/installation) for details.
+
+## Your first scrape
+
+Create a file and paste this:
+
+```javascript
+import { ReaderClient } from "@vakra-dev/reader";
+
+const reader = new ReaderClient({ verbose: true });
+
+try {
+  const result = await reader.scrape({
+    urls: ["https://example.com"],
+    formats: ["markdown"],
+  });
+
+  const page = result.data[0];
+  console.log(`Title:    ${page.metadata.website.title}`);
+  console.log(`Engine:   ${page.metadata.engine}`);
+  console.log(`Duration: ${page.metadata.duration}ms`);
+  console.log();
+  console.log(page.markdown);
+} finally {
+  await reader.close();
+}
+```
+
+Run it:
+
+```bash
+node your-file.js
+```
+
+You'll see Reader initialize, render the page in a headless browser, extract the main content, convert it to markdown, and print the result.
+
+## What just happened
+
+1. **`new ReaderClient(...)`** - creates a client. No browser yet.
+2. **`reader.scrape(...)`** - on the first call, Reader spins up a browser pool behind the scenes and runs the scrape. The pool stays alive for subsequent calls.
+3. **Hero engine** - Reader renders the page in headless Chrome with JavaScript execution, TLS fingerprinting, and proxy routing. If the first attempt fails, it escalates to a residential proxy automatically.
+4. **Content cleaning** - by default, Reader extracts only the main content, strips ads and navigation, and converts to clean markdown.
+5. **`reader.close()`** - shuts down browsers. Optional - Reader also auto-cleans on `SIGTERM` / `SIGINT`.
+
+## Try something more interesting
+
+Scrape multiple URLs in parallel with progress tracking:
+
+```javascript
+import { ReaderClient } from "@vakra-dev/reader";
+
+const reader = new ReaderClient({
+  browserPool: { size: 3 },
+});
+
+const result = await reader.scrape({
+  urls: [
+    "https://example.com",
+    "https://example.org",
+    "https://example.net",
+  ],
+  formats: ["markdown"],
+  batchConcurrency: 2,
+  onProgress: ({ completed, total, currentUrl }) => {
+    console.log(`[${completed}/${total}] ${currentUrl}`);
+  },
+});
+
+console.log(`
+  Success: ${result.batchMetadata.successfulUrls}/${result.batchMetadata.totalUrls}
+  Total:   ${result.batchMetadata.totalDuration}ms
+`);
+
+await reader.close();
+```
+
+## Where to go next
+
+<CardGroup cols={2}>
+  <Card title="Examples" icon="code" href="/self-hosted/getting-started/examples">
+    Crawling, proxy rotation, dynamic content, and more.
+  </Card>
+  <Card title="Concepts: Scraping Engine" icon="lightbulb" href="/self-hosted/concepts/engine-waterfall">
+    How the Hero engine and proxy escalation work.
+  </Card>
+  <Card title="Guides: Batch Scraping" icon="layer-group" href="/self-hosted/guides/batch-scraping">
+    Tune concurrency, handle errors, track progress.
+  </Card>
+  <Card title="API Reference" icon="book" href="/self-hosted/api-reference/reader-client">
+    Full type reference for every option.
+  </Card>
+</CardGroup>

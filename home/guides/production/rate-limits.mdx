@@ -1,0 +1,112 @@
+---
+title: "Handling rate limits"
+description: "Design for your tier's RPM, back off gracefully, and avoid the common footguns."
+---
+
+Reader has two limits: requests per minute (RPM) and concurrent jobs. This guide focuses on RPM, which is the one that bites under sustained load.
+
+## Know your quota
+
+| Tier | RPM | Concurrency |
+| --- | --- | --- |
+| Free | 10 | 2 |
+| Pro | 60 | 10 |
+| Business | 200 | 50 |
+| Enterprise | 1,000 | 200 |
+
+60 RPM on Pro means one request per second, every second. If your pipeline can burst above that, you'll get 429s. Design for the average, not the peak.
+
+## Rule #1: batch where you can
+
+The biggest footgun is firing sync scrapes in a `for` loop:
+
+```ts
+// BAD: 1000 RPM for 1000 URLs
+for (const url of urls) {
+  await client.read({ url });
+}
+```
+
+One `POST /v1/read` with `urls: [...]` counts as **one** request toward RPM:
+
+```ts
+// GOOD: 1 RPM for 1000 URLs
+await client.read({ urls }); // creates a job, SDK polls to completion
+```
+
+Polling that job is more requests, but polling once every 5 seconds for a minute is 12 requests, not 1000.
+
+## Rule #2: honor Retry-After
+
+When you get a `rate_limited` error, Reader tells you how long to wait:
+
+```json
+{
+  "error": {
+    "code": "rate_limited",
+    "details": { "limit": 60, "windowSeconds": 60, "retryAfterSeconds": 12 }
+  }
+}
+```
+
+The HTTP response also has a `Retry-After` header with the same value. The SDK honors this automatically. If you're calling the API directly, sleep for that duration before retrying:
+
+```ts
+if (code === "rate_limited") {
+  const retryAfter = parseInt(res.headers.get("Retry-After") || "5", 10);
+  await sleep(retryAfter * 1000);
+  // retry
+}
+```
+
+## Rule #3: spread out bursts
+
+If you suddenly have 500 URLs to scrape and your tier is 60 RPM, you need to feed them through at a controlled rate. Use a token bucket or a simple delay:
+
+```ts
+async function processBatch(urls: string[], rpm = 55) {
+  const delayMs = 60_000 / rpm; // ~1090ms at 55 RPM (5 RPM headroom)
+  for (const url of urls) {
+    const start = Date.now();
+    await client.read({ url });
+    const elapsed = Date.now() - start;
+    const wait = Math.max(0, delayMs - elapsed);
+    if (wait > 0) await sleep(wait);
+  }
+}
+```
+
+Leave a little headroom below your tier's RPM. Other parts of your system (credit checks, webhook management, SDK heartbeats) also make API calls.
+
+## Rule #4: don't poll too hard
+
+```ts
+// BAD: 60 requests per minute just watching one job
+while (!done) {
+  const { job } = await client.getJob(jobId);
+  if (terminal(job)) break;
+  await sleep(1000);
+}
+
+// GOOD: 12 requests per minute
+await sleep(5000);
+```
+
+For long jobs, prefer webhooks over polling so the job doesn't consume any of your rate budget.
+
+## Rule #5: separate interactive and background traffic
+
+If you have both user-facing requests and background workers sharing one API key, the background workers will eat the rate budget and starve the users. Two options:
+
+1. **Two API keys, two rate limit overrides** (Pro+): set a low RPM override on the background key so interactive traffic always has room.
+2. **A queue in front of background work**: let background requests wait, never throttle interactive requests.
+
+## Detecting approaching limits
+
+Watch for a rising `rate_limited` error rate as an early signal. The Reader dashboard shows this; you can also log it yourself and alert when it crosses a threshold.
+
+## Next
+
+- [Retry and error handling](/home/guides/production/retry-error-handling)
+- [Credit exhaustion](/home/guides/production/credit-exhaustion)
+- [Rate limits and concurrency](/home/concepts/rate-limits)

@@ -1,0 +1,12 @@
+---
+title: "Create a webhook"
+openapi: "openapi.json POST /v1/webhooks"
+---
+
+Subscribe an HTTPS endpoint to job events. The `secret` field, if provided, is used to sign every delivery with HMAC-SHA256. See [Verifying signatures](/home/concepts/webhooks#verifying-signatures).
+
+The secret is returned **once** on the create response and stripped from all subsequent list/get responses. Store it immediately.
+
+Maximum 10 webhooks per workspace.
+
+See [Webhooks](/home/concepts/webhooks) for the full delivery contract, event types, retry policy, and verification code.

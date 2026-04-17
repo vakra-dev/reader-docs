@@ -1,0 +1,43 @@
+---
+title: "Markdown and HTML together"
+description: "Request both formats in one call and pick what you need downstream."
+---
+
+Reader can return the same scrape as multiple formats in one request. You pay for one scrape (1 or 3 credits depending on mode), and the response carries whichever formats you asked for.
+
+## Request both
+
+```ts
+const result = await client.read({
+  url: "https://example.com/blog/post",
+  formats: ["markdown", "html"],
+});
+
+if (result.kind === "scrape") {
+  console.log(result.data.markdown); // for the LLM
+  console.log(result.data.html);     // for custom DOM parsing
+}
+```
+
+## When to use markdown only
+
+The default. Clean, tokenizer-friendly, good for LLMs and RAG. Use markdown by itself unless you know you need HTML.
+
+## When to include HTML
+
+- **You need structure Reader's markdown conversion strips.** For example, `<table>`s with complex layouts sometimes lose nuance in markdown. The HTML preserves it.
+- **You want to run your own parser.** If you already have a cheerio / BeautifulSoup pipeline and just need Reader's clean HTML as input, skip the markdown.
+- **You're extracting specific elements.** You want just the first `<img>`, or every `<blockquote>`, without parsing markdown back.
+
+Asking for both formats costs the same as asking for one: Reader scrapes once and serializes twice. Leave both on during development, drop to `["markdown"]` in production once you know what you need.
+
+## What HTML you actually get
+
+The HTML Reader returns is **cleaned**, not the raw DOM. Scripts, styles, tracking pixels, and (if `onlyMainContent: true`) boilerplate are already removed. It's the same DOM Reader used internally to generate the markdown: good for parsing, not for rehydrating the original page.
+
+If you need the absolute raw HTML, set `onlyMainContent: false`. Reader will skip its boilerplate stripping and give you closer to the source.
+
+## Next
+
+- [Main content extraction](/home/guides/getting-started/main-content)
+- [Include and exclude selectors](/home/guides/getting-started/selectors)

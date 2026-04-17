@@ -1,0 +1,77 @@
+---
+title: "Stuck jobs"
+description: "What to do when a job sits in `processing` longer than you expect."
+---
+
+A job that stays in `processing` for longer than you expected is usually one of three things: it's actually still running (most common), it's hit a slow target site, or something's wrong. This guide helps you tell them apart.
+
+## Step 1: check the progress
+
+```ts
+const { job } = await client.getJob(jobId, { limit: 1 });
+console.log(`${job.status}: ${job.completed}/${job.total}`);
+console.log(`started: ${job.startedAt}, elapsed: ${elapsedSince(job.startedAt)}`);
+```
+
+If `completed` is climbing steadily, even slowly, the job is still alive and you just need to wait. Crawls of slow sites can take 10+ minutes.
+
+## Step 2: is progress stalled?
+
+Check again in a minute. If `completed` hasn't moved:
+
+- **Inspect the last few results.** What are their `duration` values? Very high durations (30+ seconds per page) indicate a slow target site.
+- **Check the error field.** `job.error` is set if the whole job hit a fatal error.
+- **Look at individual page errors.** Failing pages show up in `results` with `error` set. If every recent page is failing, the target site is probably blocking or down.
+
+## Step 3: is the target site the problem?
+
+Open a few of the URLs in your browser. If they're slow or failing in a browser, Reader is seeing the same thing.
+
+- **Site is slow:** bump `timeoutMs` on your next batch (up to 120 seconds) to give each page more budget.
+- **Site is blocking:** try `proxyMode: "stealth"` on a new batch to see if escalation gets through.
+- **Site is down:** wait it out or skip those URLs.
+
+## Step 4: cancel and retry
+
+If you're sure the job is stuck and there's nothing useful left to collect:
+
+```ts
+await client.cancelJob(jobId);
+
+// Retry with adjustments
+await client.read({
+  urls: failedUrls,
+  timeoutMs: 60_000,
+  proxyMode: "stealth",
+});
+```
+
+Cancelling preserves the results already collected; you can read them from the cancelled job's `results` array.
+
+## Reasons jobs legitimately take a long time
+
+- **Crawls of large sites**: a 1,000-page crawl at a few seconds per page is 30+ minutes.
+- **Stealth mode**: runs noticeably slower than standard on average.
+- **Sites with aggressive rate limiting**: Reader backs off to avoid being rate-limited itself.
+- **High concurrency tier saturation**: if your workspace has many active jobs, Reader may queue new ones rather than starting immediately.
+
+## Time-out your own waits
+
+In client code, always put a hard timeout on waiting for a job:
+
+```ts
+const job = await client.waitForJob(jobId, {
+  timeout: 15 * 60_000, // 15 minutes
+});
+```
+
+Better to get a clean timeout from the SDK and handle it than to block forever.
+
+## If you think it's our fault
+
+If a job has been `processing` for over an hour with no progress and the target URLs work fine in a browser, that's likely a Reader-side issue. Post in Discord or file a support ticket including the job ID and the `x-request-id` from the original POST. We can find it in our logs and tell you what's happening.
+
+## Next
+
+- [Retry and error handling](/home/guides/production/retry-error-handling)
+- [Cloudflare and bot walls](/home/guides/troubleshooting/cloudflare)

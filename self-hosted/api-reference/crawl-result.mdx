@@ -1,0 +1,102 @@
+---
+title: "CrawlResult"
+description: "Return type for crawl() - discovered URLs, optional scrape data, and metadata."
+---
+
+## Top-level shape
+
+```typescript
+interface CrawlResult {
+  urls: CrawlUrl[];
+  scraped?: ScrapeResult;
+  metadata: CrawlMetadata;
+}
+```
+
+- `urls` - every discovered page
+- `scraped` - present only when `scrape: true` was passed; a full [ScrapeResult](/self-hosted/api-reference/scrape-result)
+- `metadata` - aggregate stats for the crawl
+
+## CrawlUrl
+
+```typescript
+interface CrawlUrl {
+  url: string;
+  title: string;
+  description: string | null;
+}
+```
+
+One entry per discovered page. Title and description come from the page's `<title>` and meta description tags, extracted during discovery without doing a full scrape.
+
+## CrawlMetadata
+
+```typescript
+interface CrawlMetadata {
+  totalUrls: number;
+  maxDepth: number;       // actual max depth reached
+  totalDuration: number;  // milliseconds
+  seedUrl: string;
+}
+```
+
+## Example - discovery only
+
+```javascript
+const result = await reader.crawl({
+  url: "https://docs.example.com",
+  depth: 2,
+  maxPages: 10,
+});
+
+// {
+//   urls: [
+//     { url: "https://docs.example.com/", title: "Docs", description: "..." },
+//     { url: "https://docs.example.com/intro", title: "Introduction", description: "..." },
+//     ...
+//   ],
+//   metadata: {
+//     totalUrls: 10,
+//     maxDepth: 2,
+//     totalDuration: 8432,
+//     seedUrl: "https://docs.example.com"
+//   }
+// }
+```
+
+## Example - with scraping
+
+```javascript
+const result = await reader.crawl({
+  url: "https://docs.example.com",
+  depth: 2,
+  maxPages: 10,
+  scrape: true,
+});
+
+// {
+//   urls: [ /* discovered URLs */ ],
+//   scraped: {
+//     data: [
+//       { markdown: "...", metadata: {...} },
+//       ...
+//     ],
+//     batchMetadata: {
+//       totalUrls: 10,
+//       successfulUrls: 9,
+//       failedUrls: 1,
+//       ...
+//     }
+//   },
+//   metadata: { ... }
+// }
+```
+
+Accessing the scraped markdown:
+
+```javascript
+for (const page of result.scraped?.data ?? []) {
+  console.log(`## ${page.metadata.website.title}`);
+  console.log(page.markdown);
+}
+```

@@ -1,0 +1,68 @@
+---
+title: "Include and exclude selectors"
+description: "Precise control over what Reader keeps and drops using CSS selectors."
+---
+
+CSS selectors give you scalpel-level control over what ends up in your markdown. You'll reach for these when `onlyMainContent` isn't precise enough, typically for sites with unusual layouts or very specific extraction requirements.
+
+## includeTags: keep only these
+
+Pass a list of CSS selectors, and Reader keeps only content matching them. Everything else is dropped.
+
+```ts
+await client.read({
+  url: "https://example.com/product/42",
+  includeTags: [".product-title", ".product-description", ".product-specs"],
+});
+```
+
+Useful when a page has a predictable layout and you want only the relevant fragments: typical for product detail pages, recipe cards, event listings.
+
+## excludeTags: drop these
+
+The inverse. Keep everything, but drop what matches these selectors.
+
+```ts
+await client.read({
+  url: "https://example.com/blog/post",
+  excludeTags: [".newsletter-signup", "#related-posts", "figure.ad"],
+});
+```
+
+Useful when `onlyMainContent` leaves in something you don't want, or when you've turned it off for a reason but there's still boilerplate to trim.
+
+## Combining them
+
+Both can be passed at once. Reader runs `includeTags` first (narrows to matching content), then `excludeTags` on what remains.
+
+```ts
+await client.read({
+  url: "https://docs.example.com/api/reference",
+  includeTags: ["main"],
+  excludeTags: [".feedback-widget", ".edit-on-github"],
+});
+```
+
+## Selectors that work
+
+Reader supports the full CSS selector grammar that your browser does:
+
+- Element selectors: `article`, `main`, `p`
+- Classes: `.content`, `.post-body`
+- IDs: `#main-content`
+- Attributes: `[role="main"]`, `[data-testid="article"]`
+- Descendants: `article .content p`
+- Combinators: `main > section`
+- Pseudo-classes: `:first-child`, `:not(.sidebar)`
+
+## Tips
+
+- **Inspect the target site first.** Open the URL, use devtools, find the exact selector you want, and copy it.
+- **Prefer stable attributes.** `[data-testid="..."]` and semantic tags (`<article>`, `<main>`) are more stable than class names that change with every site redesign.
+- **Start broad, narrow down.** Begin with a broad selector, verify Reader returns what you expect, then tighten.
+- **Selectors are per-request.** There's no "global" selector list; pass them every time, or wrap your calls in a helper.
+
+## Next
+
+- [Main content extraction](/home/guides/getting-started/main-content): the default that selectors refine
+- [Dynamic content](/home/guides/advanced/dynamic-content): when selectors need `waitForSelector`

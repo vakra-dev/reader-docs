@@ -1,0 +1,126 @@
+---
+title: "Building a progress bar"
+description: "Wire SSE events to a CLI or UI progress indicator."
+---
+
+For any job longer than a few seconds, users want to see progress. Reader's per-job SSE stream gives you exactly the events you need.
+
+## CLI progress bar (Node)
+
+Using the `cli-progress` library:
+
+```ts
+import cliProgress from "cli-progress";
+import { ReaderClient } from "@vakra-dev/reader-js";
+
+const client = new ReaderClient({ apiKey: process.env.READER_KEY! });
+const bar = new cliProgress.SingleBar(
+  { format: "Scraping |{bar}| {percentage}% | {value}/{total} | {url}" },
+  cliProgress.Presets.shades_classic,
+);
+
+// Start the job
+const result = await client.read({ urls: loadUrls() });
+// client.read polls internally, but for a progress UI we want explicit events.
+
+// Cleaner: start the job, get the ID, then stream.
+// (Using the underlying /v1/read directly for illustration.)
+const res = await fetch("https://api.reader.dev/v1/read", {
+  method: "POST",
+  headers: {
+    "Content-Type": "application/json",
+    "x-api-key": process.env.READER_KEY!,
+  },
+  body: JSON.stringify({ urls: loadUrls() }),
+});
+const { data: job } = await res.json();
+
+bar.start(job.total, 0);
+let lastUrl = "";
+
+for await (const event of client.stream(job.id)) {
+  if (event.type === "page") {
+    lastUrl = event.data.url;
+    bar.increment({ url: lastUrl });
+  }
+  if (event.type === "done") {
+    bar.stop();
+    break;
+  }
+}
+```
+
+## Browser UI (React)
+
+```tsx
+import { useEffect, useState } from "react";
+
+function ScrapeProgress({ jobId }: { jobId: string }) {
+  const [progress, setProgress] = useState({ completed: 0, total: 0 });
+  const [status, setStatus] = useState("queued");
+
+  useEffect(() => {
+    const source = new EventSource(
+      `https://api.reader.dev/v1/jobs/${jobId}/stream`,
+      // NOTE: EventSource in the browser can't set custom headers directly.
+      // Proxy the stream through your own backend that adds the x-api-key,
+      // or use the `event-source-polyfill` package.
+    );
+
+    source.addEventListener("progress", (ev) => {
+      const data = JSON.parse(ev.data);
+      setProgress({ completed: data.completed, total: data.total });
+      setStatus(data.status);
+    });
+
+    source.addEventListener("done", (ev) => {
+      const data = JSON.parse(ev.data);
+      setStatus(data.status);
+      source.close();
+    });
+
+    return () => source.close();
+  }, [jobId]);
+
+  const pct = progress.total > 0 ? (progress.completed / progress.total) * 100 : 0;
+
+  return (
+    <div>
+      <div style={{ width: "100%", background: "#eee", height: 12 }}>
+        <div style={{ width: `${pct}%`, background: "#10b981", height: 12 }} />
+      </div>
+      <p>
+        {progress.completed} / {progress.total} ({status})
+      </p>
+    </div>
+  );
+}
+```
+
+## The API-key-in-browser problem
+
+Browsers can't set custom headers on `EventSource`, so you can't send `x-api-key` directly from the client. Two options:
+
+1. **Proxy through your backend.** Your server opens the SSE stream to Reader with the key, and forwards events to the browser over your own SSE endpoint. Keeps the key server-side.
+2. **Use a polyfill.** Packages like `event-source-polyfill` support custom headers, but you're exposing your API key to the browser, which is usually a bad idea.
+
+The proxy pattern is the right choice for anything public-facing.
+
+## Smooth-step trick
+
+If the job finishes faster than the UI can animate, end frames can feel choppy. A common trick: interpolate from current progress to target progress over a short window (200–500ms) rather than snapping instantly.
+
+```tsx
+const [display, setDisplay] = useState(0);
+useEffect(() => {
+  const id = setInterval(() => {
+    setDisplay((d) => d + (progress.completed - d) * 0.2);
+  }, 50);
+  return () => clearInterval(id);
+}, [progress.completed]);
+```
+
+## Next
+
+- [SSE streaming](/home/guides/async-workflows/sse-streaming)
+- [Reliable batch processing](/home/guides/async-workflows/reliable-batch)

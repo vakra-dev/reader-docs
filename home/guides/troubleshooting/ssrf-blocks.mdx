@@ -1,0 +1,66 @@
+---
+title: "URL blocked errors"
+description: "Why Reader refuses some URLs and what to do about it."
+---
+
+When Reader returns `url_blocked` (HTTP 403), it means we refused to fetch the URL for safety reasons. This isn't about bot detection or auth. It's about a class of URLs we never fetch, regardless of who asks.
+
+## Why Reader blocks URLs
+
+Reader runs on infrastructure with network access to things you don't. If an attacker could convince Reader to fetch arbitrary URLs, they could reach:
+
+- Internal admin endpoints on our network (`http://127.0.0.1:admin`)
+- Cloud metadata endpoints that leak credentials (`http://169.254.169.254/`)
+- Internal services on private networks (`http://10.0.0.1/`)
+- File system paths through funky URL schemes (`file:///etc/passwd`)
+
+This is the SSRF attack class. Blocking them at the URL-validation step keeps Reader safe and keeps your scrapes honest.
+
+## What gets blocked
+
+- **Private IPv4 ranges:** `10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`, `127.0.0.0/8`, `169.254.0.0/16`
+- **Private IPv6 ranges:** `::1`, `fc00::/7`, `fe80::/10`
+- **Non-HTTP schemes:** `file://`, `ftp://`, `gopher://`, `ldap://`, `javascript:`, etc.
+- **Hostnames that resolve to private IPs:** we check DNS, not just the hostname string
+- **URLs that redirect to private IPs** mid-request
+
+The error includes the reason:
+
+```json
+{
+  "error": {
+    "code": "url_blocked",
+    "message": "URL blocked: Resolves to private IP",
+    "details": { "url": "...", "reason": "Resolves to private IP" }
+  }
+}
+```
+
+## Legitimate false positives
+
+Sometimes Reader blocks a URL you can reach from your own machine. Common causes:
+
+- **Your domain points to a private IP.** If `internal.your-company.com` resolves publicly to `10.0.0.5`, Reader blocks it. Reader can't reach private addresses anyway; the block is the right behavior.
+- **Weird DNS.** Some DNS providers return different addresses to different clients. If we see a private IP and your machine sees a public one, Reader blocks based on what we see.
+
+For these, the real fix is to expose the content on a public address that Reader can reach.
+
+## Not a false positive: what's blocked stays blocked
+
+If you're trying to scrape `localhost`, a private IP, or a cloud metadata endpoint, we're not going to unblock it. This is security policy, not configuration. If you need content from a private service, run [Reader self-hosted](/self-hosted/getting-started/introduction) on your own infrastructure. The self-hosted version has no such restrictions because you're the only one using it.
+
+## What to check when you get `url_blocked`
+
+1. **Open the URL in your browser.** Does it actually work on the public internet? If not, Reader can't reach it either.
+2. **Check DNS.** `nslookup your-hostname.com` from a public DNS resolver. If the answer is a private IP, Reader sees the same answer.
+3. **Check for typos.** `hppts://` and `htttp://` are not HTTP schemes.
+4. **Check redirects.** If `public-url.com` redirects to a private IP, Reader blocks at the redirect step.
+
+## Webhook URLs are validated too
+
+When you create a webhook, Reader validates the delivery URL by the same rules. You can't point a webhook at `localhost` or a private IP; Reader will refuse to create the webhook. Use a public HTTPS endpoint, or a tunneling tool like ngrok for local development.
+
+## Next
+
+- [Errors (concept)](/home/concepts/errors)
+- [Self-hosting Reader](/self-hosted/getting-started/introduction)

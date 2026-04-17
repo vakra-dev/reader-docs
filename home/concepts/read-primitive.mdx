@@ -1,0 +1,126 @@
+---
+title: "The read primitive"
+description: "One endpoint, three shapes of input. Scrape, batch, and crawl all flow through POST /v1/read."
+---
+
+Reader exposes a single content-extraction endpoint: `POST /v1/read`. What you pass in the body determines whether Reader runs a synchronous scrape, a batch job, or a crawl.
+
+## Three shapes of input
+
+| You send | Reader does | You get back |
+| --- | --- | --- |
+| `url: "..."` | Scrape that one URL synchronously | `{ kind: "scrape", data }` with markdown in-line |
+| `urls: [...]` (one or more) | Batch job that scrapes every URL async | `{ kind: "job", data }` with job ID to poll |
+| `url` + `maxPages` or `maxDepth` | Crawl the site starting from `url` | `{ kind: "job", data }` with job ID to poll |
+
+Everything else (formats, selectors, proxy mode, caching, webhooks) is a modifier on top of one of those three shapes.
+
+## Why one endpoint
+
+You learn one contract instead of four. Your code branches on what it sent, not on which URL it called. When you want to swap a batch for a crawl, you change the body; the endpoint, auth, error handling, retry logic, and response envelope all stay the same.
+
+## Synchronous scrape
+
+```bash
+curl -X POST https://api.reader.dev/v1/read \
+  -H "x-api-key: $READER_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{ "url": "https://example.com" }'
+```
+
+Response (200):
+
+```json
+{
+  "success": true,
+  "data": {
+    "url": "https://example.com",
+    "markdown": "# Example Domain\n\nThis domain is for use in illustrative examples...",
+    "metadata": {
+      "title": "Example Domain",
+      "duration": 487,
+      "cached": false,
+      "proxyMode": "standard",
+      "proxyEscalated": false,
+      "scrapedAt": "2026-04-04T12:00:00Z"
+    }
+  }
+}
+```
+
+Sync scrape returns immediately: typically under a second for cached or simple pages, a few seconds for heavy ones. Use it when you have one URL and a human (or tight request budget) waiting for the answer.
+
+## Async batch or crawl
+
+```bash
+curl -X POST https://api.reader.dev/v1/read \
+  -H "x-api-key: $READER_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "urls": [
+      "https://example.com/page-1",
+      "https://example.com/page-2",
+      "https://example.com/page-3"
+    ]
+  }'
+```
+
+Response (201):
+
+```json
+{
+  "success": true,
+  "data": {
+    "id": "job_9fba2",
+    "status": "queued",
+    "mode": "batch",
+    "total": 3,
+    "completed": 0,
+    "creditsUsed": 0,
+    "createdAt": "2026-04-04T12:00:00Z"
+  }
+}
+```
+
+Use the `id` to poll `GET /v1/jobs/{id}`, stream progress with SSE, or subscribe a webhook for completion. See [Async jobs](/home/concepts/async-jobs).
+
+## What Reader decides for you
+
+You tell Reader **what** to fetch. Reader decides **how**:
+
+- How to render the page (full browser with JavaScript execution and TLS fingerprinting).
+- Whether to escalate the proxy from datacenter to residential when a block is detected (see [Proxy modes](/home/concepts/proxy-modes)).
+- Whether to serve from cache.
+- How to parallelize a batch.
+
+This is on purpose. These are the decisions that change as the web changes; baking them into your client code means every change to the web is a change to your code. Reader keeps that surface on our side.
+
+## Response envelope
+
+Every JSON response from `/v1/read` follows the same envelope:
+
+```json
+{ "success": true, "data": { /* result or job */ } }
+```
+
+Errors use a parallel envelope:
+
+```json
+{
+  "success": false,
+  "error": {
+    "code": "insufficient_credits",
+    "message": "You need 50 credits but only 10 are available.",
+    "details": { "required": 50, "available": 10 },
+    "docsUrl": "https://reader.dev/docs/home/concepts/errors#insufficient-credits"
+  }
+}
+```
+
+See [Errors](/home/concepts/errors) for the full code catalog.
+
+## Next
+
+- [Scrape vs crawl](/home/concepts/scrape-vs-crawl): when to pick which mode
+- [Proxy modes](/home/concepts/proxy-modes): `standard`, `stealth`, and `auto`
+- [Async jobs](/home/concepts/async-jobs): poll, stream, or webhook-notify

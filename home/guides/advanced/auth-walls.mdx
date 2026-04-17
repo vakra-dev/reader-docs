@@ -1,0 +1,73 @@
+---
+title: "Auth walls and hostile sites"
+description: "When to force stealth, what Reader can't do, and how to spot a site that won't work."
+---
+
+Some pages won't load for any non-human request no matter what you do. Others work fine but require the right mode. This guide is about telling them apart and picking the right strategy.
+
+## What Reader can handle
+
+`stealth` mode (or `auto` with escalation) gets you past:
+
+- **Bot-detection walls.** Cloudflare's "Checking your browser", Akamai, PerimeterX, Datadome, similar.
+- **Rate-limited "come back later" pages** that serve bot-looking clients a different response than humans.
+- **TLS fingerprinting** that tries to distinguish automated clients from browsers.
+- **Most JavaScript challenges** where the page runs a small script before letting you in.
+
+For these, set `proxyMode: "stealth"` explicitly (or let `auto` handle it) and you'll usually get clean content:
+
+```ts
+await client.read({
+  url: "https://shop.example.com/item/42",
+  proxyMode: "stealth", // 3 credits/page, bypasses bot walls
+});
+```
+
+## What Reader can't handle
+
+**Anything that requires an authenticated session.** Pages that load only when you're logged in (your Gmail inbox, your LinkedIn feed, internal tools, most "my account" sections) are off-limits. Reader doesn't have your credentials and doesn't manage cookies across requests.
+
+If you need content from a page that requires login, you have two options:
+
+1. **Use the site's official API** if they have one (most authenticated experiences do).
+2. **Scrape it yourself with your own session** and point Reader at the public version if it has one.
+
+**Content behind paywalls.** Reader respects the paywall: you get the preview, not the full article. This is both a technical limit and a deliberate one.
+
+**CAPTCHAs that require human interaction.** Reader's stealth mode handles most automated challenges but won't solve a visual CAPTCHA. If a page pops one of those, the scrape will either time out or return the challenge page as content.
+
+## Spotting a hostile site early
+
+If your scrapes are failing with `upstream_unavailable`, `scrape_timeout`, or are returning very short `markdown` that doesn't match the real page:
+
+1. **Check `metadata.statusCode`.** A 403 or 429 from the target means a block.
+2. **Check `metadata.proxyMode`.** If you're on `auto` and it escalated to `stealth` but still failed, the site is hostile beyond what Reader handles.
+3. **Open the URL in your browser.** If you see a "Checking your browser" interstitial or a CAPTCHA, Reader is seeing the same thing.
+
+## Forcing stealth from the start
+
+When you know ahead of time a target is hostile (Amazon, LinkedIn, booking.com, ticketing sites, some news aggregators), skip the optimistic `auto` attempt and go straight to stealth:
+
+```ts
+await client.read({
+  url: "https://www.amazon.com/dp/B08N5WRWNW",
+  proxyMode: "stealth",
+});
+```
+
+Reasons to do this:
+
+- **You save the wasted `standard` attempt.** `auto` would try standard first, see a block, then retry with stealth, so you pay 1 credit for the wasted attempt plus latency.
+- **You get a cleaner error signal.** If you force stealth and it still fails, you know the site is beyond Reader's reach; you don't have to wonder if the escalation hadn't kicked in.
+
+The cost is 3 credits per page regardless of whether the site actually needed stealth. For a known-hostile target, that's fine.
+
+## When nothing works
+
+If you've tried `stealth`, `waitForSelector`, and custom extraction and the page still won't load, the site is probably actively hostile to all non-browser traffic. Report the URL to our Discord and we'll take a look. Sometimes we can tune our handling for a specific site, sometimes the answer is "no, this one's out of scope."
+
+## Next
+
+- [Choosing a proxy mode](/home/guides/advanced/choosing-a-proxy-mode)
+- [Cloudflare and anti-bot errors](/home/guides/troubleshooting/cloudflare)
+- [Dynamic content](/home/guides/advanced/dynamic-content)

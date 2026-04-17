@@ -1,0 +1,95 @@
+---
+title: "scrape()"
+description: "Scrape one or more URLs and return cleaned content."
+---
+
+## Signature
+
+```typescript
+reader.scrape(options: ScrapeOptions): Promise<ScrapeResult>
+```
+
+## Minimal example
+
+```javascript
+const result = await reader.scrape({
+  urls: ["https://example.com"],
+  formats: ["markdown"],
+});
+
+console.log(result.data[0].markdown);
+```
+
+## Multi-URL example
+
+```javascript
+const result = await reader.scrape({
+  urls: [
+    "https://example.com",
+    "https://example.org",
+    "https://example.net",
+  ],
+  formats: ["markdown", "html"],
+  batchConcurrency: 2,
+  onProgress: ({ completed, total }) => {
+    console.log(`${completed}/${total}`);
+  },
+});
+
+console.log(`Success: ${result.batchMetadata.successfulUrls}`);
+```
+
+## Parameter
+
+`options: ScrapeOptions` - see [ScrapeOptions](/self-hosted/api-reference/scrape-options) for the full field list.
+
+The only required field is `urls: string[]`. Everything else has sensible defaults.
+
+## Return type
+
+`Promise<ScrapeResult>` - see [ScrapeResult](/self-hosted/api-reference/scrape-result) for the full shape.
+
+Key fields:
+
+```typescript
+{
+  data: WebsiteScrapeResult[];    // One entry per successful URL
+  batchMetadata: {
+    totalUrls: number;
+    successfulUrls: number;
+    failedUrls: number;
+    totalDuration: number;
+    errors?: Array<{ url: string; error: string }>;
+  };
+}
+```
+
+## Single vs batch behavior
+
+- **Single URL** - `urls: [oneUrl]`. `data` has one entry.
+- **Multiple URLs** - `urls: [url1, url2, ...]`. Set `batchConcurrency` to control parallelism.
+
+`scrape()` behaves the same way in both cases - the only difference is the number of URLs and the parallelism. There's no separate single-URL method.
+
+## Error behavior
+
+`scrape()` does **not** throw on individual URL failures. Failed URLs are reported in `result.batchMetadata.errors`, and only successful results appear in `result.data`.
+
+`scrape()` **does** throw on:
+- Invalid options (`ValidationError`)
+- All engines exhausted for a single URL (`RetryBudgetExhaustedError`)
+- Browser pool exhausted (`PoolExhaustedError`)
+- Client closed (`ClientClosedError`)
+
+See [Error Handling](/self-hosted/concepts/error-handling).
+
+## Where to go next
+
+<CardGroup cols={2}>
+  <Card title="ScrapeOptions" icon="sliders" href="/self-hosted/api-reference/scrape-options">
+    Every option with type and default.
+  </Card>
+  <Card title="ScrapeResult" icon="file-lines" href="/self-hosted/api-reference/scrape-result">
+    The full result type tree.
+  </Card>
+</CardGroup>

@@ -1,0 +1,110 @@
+---
+title: "Browser Pool"
+description: "How Reader manages long-lived browser instances with recycling and health checks."
+---
+
+The browser pool is how self-hosted Reader scales. Spinning up a new headless Chrome instance costs 1-2 seconds and ~300-500 MB of RAM. Doing that per-request is fine for dev but untenable in production. Reader maintains a pool of warm browser instances, reuses them across requests, and retires them before they accumulate memory or state issues.
+
+## What's in the pool
+
+Each entry in the pool is a Hero browser instance:
+
+- A running headless Chrome process
+- A Hero Core connection for scripting it
+- A small amount of bookkeeping (page count, age, health)
+
+When you call `scrape()` or `crawl()`, Reader checks out an available instance, runs the request, and checks it back in. If no instance is free, the request queues.
+
+## Configuration
+
+Configure the pool via the `browserPool` option on `ReaderClient`:
+
+```javascript
+const reader = new ReaderClient({
+  browserPool: {
+    size: 5,
+    retireAfterPages: 100,
+    retireAfterMinutes: 30,
+    maxQueueSize: 100,
+  },
+});
+```
+
+| Option | Default | Purpose |
+|---|---|---|
+| `size` | `2` | Number of browser instances |
+| `retireAfterPages` | `100` | Recycle an instance after N pages |
+| `retireAfterMinutes` | `30` | Recycle an instance after N minutes |
+| `maxQueueSize` | `100` | Max pending requests when all instances are busy |
+
+## Recycling
+
+Browser instances are retired to prevent memory leaks. Chrome holds onto DOM nodes, JavaScript context, and network buffers indefinitely within a single process. The longer a process runs, the more memory it consumes - even after you close tabs.
+
+Reader's solution is automatic recycling:
+
+- **`retireAfterPages`** - once an instance has scraped N pages, it's marked for retirement
+- **`retireAfterMinutes`** - once an instance has been alive N minutes, it's marked for retirement
+- **Whichever comes first** triggers recycling - the instance finishes any in-flight request, then gets shut down and replaced
+
+A check runs every 60 seconds to identify retiring instances. Replacement happens in the background so the pool size stays constant.
+
+## Health checks
+
+Every 5 minutes, Reader runs a health check on each instance. If an instance:
+
+- Fails to respond
+- Crashes
+- Returns errors on 3 consecutive requests
+
+...it's marked unhealthy and immediately retired.
+
+## Queueing
+
+When all pool instances are busy, new requests queue. Queue limits:
+
+- **`maxQueueSize: 100`** - requests beyond this fail immediately with `POOL_EXHAUSTED`
+- **Queue timeout: 60 seconds** - requests waiting longer than this fail with a timeout error
+
+## Sizing guidance
+
+| Workload | Suggested `size` |
+|---|---|
+| Development, one-off scripts | `2` (default) |
+| Small production, low traffic | `3-5` |
+| Medium production, regular batch jobs | `5-10` |
+| High volume, crawl-heavy | `10-20` with careful memory monitoring |
+
+Each instance uses **~300-500 MB of RAM**. Multiply by `size` to estimate peak memory. On a server with 8 GB RAM, `size: 10` is comfortable; `size: 20` is pushing it.
+
+**Oversizing** causes memory pressure and swap thrashing. **Undersizing** causes queue backups and request timeouts. Monitor `PoolStats` in production and tune based on observed queue depth and latency.
+
+## Pool stats
+
+Every `ReaderClient` exposes pool stats for monitoring:
+
+```typescript
+interface PoolStats {
+  total: number;              // Total instances
+  available: number;          // Idle, ready for a request
+  busy: number;               // Currently processing a request
+  recycling: number;          // Being retired
+  unhealthy: number;          // Marked unhealthy
+  queueLength: number;        // Pending requests
+  totalRequests: number;      // Lifetime count
+  avgRequestDuration: number; // Average ms per request
+}
+```
+
+Expose these via a `/health` endpoint in your app and watch them in your observability stack.
+
+## Where to go next
+
+<CardGroup cols={2}>
+  <Card title="Deployment guide" icon="server" href="/self-hosted/guides/deployment">
+    Memory limits, monitoring, production tuning.
+  </Card>
+  <Card title="Batch Scraping guide" icon="layer-group" href="/self-hosted/guides/batch-scraping">
+    Tune pool size for concurrent workloads.
+  </Card>
+</CardGroup>

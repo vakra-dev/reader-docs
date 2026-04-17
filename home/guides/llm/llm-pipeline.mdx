@@ -1,0 +1,128 @@
+---
+title: "Feeding Reader output to an LLM"
+description: "From URL to model prompt: the minimal pipeline and what to watch out for."
+---
+
+Reader's whole point is LLM-ready content. This guide shows the simplest possible pipeline from a URL to an LLM response, plus the pitfalls that show up as you scale.
+
+## The minimal pipeline
+
+```ts
+import { ReaderClient } from "@vakra-dev/reader-js";
+import Anthropic from "@anthropic-ai/sdk";
+
+const reader = new ReaderClient({ apiKey: process.env.READER_KEY! });
+const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY! });
+
+async function summarize(url: string): Promise<string> {
+  const result = await reader.read({ url });
+  if (result.kind !== "scrape") throw new Error("unexpected async result");
+
+  const content = result.data.markdown ?? "";
+
+  const response = await anthropic.messages.create({
+    model: "claude-opus-4-6",
+    max_tokens: 1024,
+    messages: [
+      {
+        role: "user",
+        content: `Summarize this article in 3 sentences:\n\n${content}`,
+      },
+    ],
+  });
+
+  return response.content[0].type === "text" ? response.content[0].text : "";
+}
+
+const summary = await summarize("https://example.com/long-article");
+console.log(summary);
+```
+
+That's the whole shape: scrape → markdown → prompt. Reader handles every step before the LLM.
+
+## Keep `onlyMainContent: true`
+
+Reader's default extraction strips navigation, sidebars, cookie banners, and footer boilerplate. Your LLM doesn't need those tokens, and they confuse questions like "what's the author's main argument?".
+
+```ts
+await reader.read({ url, onlyMainContent: true }); // default
+```
+
+Only turn it off if you specifically need the page's non-article chrome (links, navigation structure, etc.) for your prompt.
+
+## Tokens and truncation
+
+Long articles can blow through your model's context window. Two strategies:
+
+**Truncate the content** if you just want a summary and don't need every word:
+
+```ts
+const truncated = content.slice(0, 40_000); // rough chars → tokens estimate
+```
+
+**Chunk and iterate** if you need to reason across the whole document. See [RAG](/home/guides/llm/rag) for the deeper pattern.
+
+## Prompt shape
+
+Reader returns clean markdown with headings, lists, and code blocks preserved. Let your LLM see that structure; don't flatten it to plain text:
+
+```ts
+const prompt = `You are a technical writer. Summarize the following article for busy engineers.
+
+The article is in markdown. Preserve code blocks in your response if they're important.
+
+---
+${content}
+---
+
+Summary:`;
+```
+
+Models that trained on markdown (most recent ones) benefit from seeing the structural cues.
+
+## Citing sources back to the user
+
+Reader's response includes `url` (canonical, after redirects) and `metadata.title`. Keep those around so your LLM output can cite:
+
+```ts
+const result = await reader.read({ url });
+if (result.kind === "scrape") {
+  const source = `[${result.data.metadata.title}](${result.data.url})`;
+  // Include `source` in your final LLM response to the user
+}
+```
+
+## Caching is your friend
+
+Reader caches every successful scrape for 24 hours. If you're iterating on a prompt against the same URL, every request after the first is free. Leave `cache: true` on (it's the default).
+
+## Error handling
+
+A failed scrape means your LLM has no content to reason about. Decide what to do:
+
+- **Fail loudly.** Propagate the error to the user; better than an LLM hallucinating an answer to an empty prompt.
+- **Fall back to search.** If scrape fails, the user at least gets a "I couldn't read this, here's what I could find" response.
+- **Retry once with a different mode.** If `standard` failed, force `stealth` and try again.
+
+```ts
+import { UpstreamUnavailableError, ScrapeTimeoutError } from "@vakra-dev/reader-js";
+
+try {
+  const result = await reader.read({ url });
+  // ...
+} catch (err) {
+  if (err instanceof UpstreamUnavailableError || err instanceof ScrapeTimeoutError) {
+    // retry with stealth
+    const result = await reader.read({ url, proxyMode: "stealth" });
+    // ...
+  } else {
+    throw err;
+  }
+}
+```
+
+## Next
+
+- [RAG pipeline](/home/guides/llm/rag)
+- [Reader as an agent tool](/home/guides/llm/agent-tool)
+- [Structured data extraction](/home/guides/llm/structured-data)

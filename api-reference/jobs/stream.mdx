@@ -1,0 +1,19 @@
+---
+title: "Per-job events stream (SSE)"
+openapi: "openapi.json GET /v1/jobs/{id}/stream"
+---
+
+Stream events for a single job over a long-lived HTTP connection. Events fire as pages complete and the stream closes automatically when the job reaches a terminal state.
+
+## Event types
+
+| Event | Payload |
+| --- | --- |
+| `progress` | `{ status, completed, total }`: periodic progress snapshots |
+| `page` | A completed page result (same shape as a sync scrape) |
+| `error` | `{ url, error }`: a single page failed |
+| `done` | `{ status, completed, total }`: final event, stream closes |
+
+The SDK clients wrap this as `client.stream(jobId)` returning an async iterator. See [SSE streaming](/home/guides/async-workflows/sse-streaming).
+
+For a workspace-wide stream of every job's events, use [`GET /v1/events`](/api-reference/jobs/events) instead.

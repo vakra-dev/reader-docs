@@ -20,11 +20,15 @@
     {
       "name": "GitHub",
       "url": "https://github.com/vakra-dev/reader"
+    },
+    {
+      "name": "Dashboard",
+      "url": "https://app.reader.dev"
     }
   ],
   "topbarCtaButton": {
-    "name": "Get Started",
-    "url": "https://reader.dev"
+    "name": "Sign up free",
+    "url": "https://app.reader.dev/register"
   },
   "tabs": [
     {
@@ -32,12 +36,16 @@
       "url": "home"
     },
     {
-      "name": "Documentation",
-      "url": "documentation"
+      "name": "SDKs",
+      "url": "sdk"
     },
     {
       "name": "API Reference",
       "url": "api-reference"
+    },
+    {
+      "name": "Self-Hosted",
+      "url": "self-hosted"
     }
   ],
   "anchors": [
@@ -47,63 +55,186 @@
       "url": "https://github.com/vakra-dev/reader"
     },
     {
-      "name": "npm",
-      "icon": "npm",
-      "url": "https://www.npmjs.com/package/@vakra-dev/reader"
+      "name": "Discord",
+      "icon": "discord",
+      "url": "https://discord.gg/6tjkq7J5WV"
     }
   ],
   "navigation": [
     {
-      "group": "Home",
-      "pages": ["home/introduction", "home/quickstart", "home/examples"]
-    },
-    {
-      "group": "Documentation",
-      "pages": ["documentation/overview"]
+      "group": "Get Started",
+      "pages": [
+        "home/introduction",
+        "home/quickstart"
+      ]
     },
     {
       "group": "Concepts",
       "pages": [
-        "documentation/concepts/scraping",
-        "documentation/concepts/crawling",
-        "documentation/concepts/content-extraction",
-        "documentation/concepts/browser-pool"
+        "home/concepts/read-primitive",
+        "home/concepts/scrape-vs-crawl",
+        "home/concepts/formats-and-extraction",
+        "home/concepts/proxy-modes",
+        "home/concepts/caching",
+        "home/concepts/credits-and-billing",
+        "home/concepts/rate-limits",
+        "home/concepts/async-jobs",
+        "home/concepts/events",
+        "home/concepts/webhooks",
+        "home/concepts/errors"
+      ]
+    },
+    {
+      "group": "Getting Started Guides",
+      "pages": [
+        "home/guides/getting-started/first-scrape",
+        "home/guides/getting-started/markdown-and-html",
+        "home/guides/getting-started/main-content",
+        "home/guides/getting-started/selectors"
+      ]
+    },
+    {
+      "group": "Async Workflows",
+      "pages": [
+        "home/guides/async-workflows/polling-jobs",
+        "home/guides/async-workflows/sse-streaming",
+        "home/guides/async-workflows/polling-vs-sse-vs-webhooks",
+        "home/guides/async-workflows/webhook-workflows",
+        "home/guides/async-workflows/verifying-webhooks",
+        "home/guides/async-workflows/webhook-retries",
+        "home/guides/async-workflows/progress-bars",
+        "home/guides/async-workflows/reliable-batch"
+      ]
+    },
+    {
+      "group": "Production Patterns",
+      "pages": [
+        "home/guides/production/retry-error-handling",
+        "home/guides/production/rate-limits",
+        "home/guides/production/credit-exhaustion",
+        "home/guides/production/monitoring",
+        "home/guides/production/cost-estimation"
+      ]
+    },
+    {
+      "group": "Advanced Scraping",
+      "pages": [
+        "home/guides/advanced/batch-scraping",
+        "home/guides/advanced/crawling",
+        "home/guides/advanced/crawl-with-scrape",
+        "home/guides/advanced/dynamic-content",
+        "home/guides/advanced/auth-walls",
+        "home/guides/advanced/choosing-a-proxy-mode"
+      ]
+    },
+    {
+      "group": "LLM & AI Use Cases",
+      "pages": [
+        "home/guides/llm/llm-pipeline",
+        "home/guides/llm/rag",
+        "home/guides/llm/agent-tool",
+        "home/guides/llm/structured-data"
+      ]
+    },
+    {
+      "group": "Troubleshooting",
+      "pages": [
+        "home/guides/troubleshooting/stuck-jobs",
+        "home/guides/troubleshooting/cache-miss",
+        "home/guides/troubleshooting/ssrf-blocks",
+        "home/guides/troubleshooting/cloudflare"
+      ]
+    },
+    {
+      "group": "SDKs",
+      "pages": [
+        "sdk/overview",
+        "sdk/javascript",
+        "sdk/python"
+      ]
+    },
+    {
+      "group": "Getting Started",
+      "pages": [
+        "api-reference/authentication",
+        "api-reference/read"
+      ]
+    },
+    {
+      "group": "Jobs",
+      "pages": [
+        "api-reference/jobs/get",
+        "api-reference/jobs/cancel",
+        "api-reference/jobs/retry",
+        "api-reference/jobs/stream",
+        "api-reference/jobs/events"
+      ]
+    },
+    {
+      "group": "Webhooks",
+      "pages": [
+        "api-reference/webhooks/create",
+        "api-reference/webhooks/list",
+        "api-reference/webhooks/update",
+        "api-reference/webhooks/delete"
+      ]
+    },
+    {
+      "group": "Account",
+      "pages": [
+        "api-reference/account/credits",
+        "api-reference/account/history"
+      ]
+    },
+    {
+      "group": "Getting Started",
+      "pages": [
+        "self-hosted/getting-started/introduction",
+        "self-hosted/getting-started/installation",
+        "self-hosted/getting-started/quickstart",
+        "self-hosted/getting-started/examples"
+      ]
+    },
+    {
+      "group": "Concepts",
+      "pages": [
+        "self-hosted/concepts/scraping",
+        "self-hosted/concepts/crawling",
+        "self-hosted/concepts/content-extraction",
+        "self-hosted/concepts/browser-pool",
+        "self-hosted/concepts/engine-waterfall",
+        "self-hosted/concepts/proxy-tiers",
+        "self-hosted/concepts/error-handling"
       ]
     },
     {
       "group": "Guides",
       "pages": [
-        "documentation/guides/basic-scraping",
-        "documentation/guides/batch-scraping",
-        "documentation/guides/website-crawling",
-        "documentation/guides/proxy-configuration",
-        "documentation/guides/cli-usage",
-        "documentation/guides/deployment"
+        "self-hosted/guides/basic-scraping",
+        "self-hosted/guides/batch-scraping",
+        "self-hosted/guides/website-crawling",
+        "self-hosted/guides/proxy-configuration",
+        "self-hosted/guides/cli",
+        "self-hosted/guides/daemon-mode",
+        "self-hosted/guides/deployment"
       ]
     },
     {
       "group": "API Reference",
-      "pages": ["api-reference/overview"]
-    },
-    {
-      "group": "Classes",
-      "pages": ["api-reference/reader-client"]
-    },
-    {
-      "group": "Functions",
-      "pages": ["api-reference/scrape", "api-reference/crawl"]
-    },
-    {
-      "group": "Types",
       "pages": [
-        "api-reference/scrape-options",
-        "api-reference/scrape-result",
-        "api-reference/crawl-options",
-        "api-reference/crawl-result"
+        "self-hosted/api-reference/reader-client",
+        "self-hosted/api-reference/scrape",
+        "self-hosted/api-reference/crawl",
+        "self-hosted/api-reference/scrape-options",
+        "self-hosted/api-reference/scrape-result",
+        "self-hosted/api-reference/crawl-options",
+        "self-hosted/api-reference/crawl-result",
+        "self-hosted/api-reference/errors"
       ]
     }
   ],
   "footerSocials": {
-    "github": "https://github.com/vakra-dev/reader"
+    "github": "https://github.com/vakra-dev/reader",
+    "discord": "https://discord.gg/6tjkq7J5WV"
   }
 }

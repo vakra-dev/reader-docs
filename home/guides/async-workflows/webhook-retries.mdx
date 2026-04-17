@@ -1,0 +1,117 @@
+---
+title: "Webhook retries and idempotency"
+description: "Reader retries failed deliveries. Your handler needs to be idempotent."
+---
+
+Reader retries webhook deliveries that don't get a 2xx response, which means your handler will sometimes see the same event twice. Your job is to make that safe.
+
+## Reader's retry policy
+
+- **Timeout per attempt:** 10 seconds
+- **Retry schedule:** exponential backoff (1s, then 4s, then 16s)
+- **Max attempts:** 3
+- **Giving up:** after the third failed attempt, Reader marks the delivery as failed in the webhook's `deliveryStats` and stops trying
+
+You'll see three common failure modes:
+
+1. Your endpoint returns non-2xx (5xx error, 4xx auth failure, HTML error page)
+2. Your endpoint is unreachable (connection refused, DNS fails)
+3. Your endpoint is slow. Reader waits 10 seconds, times out, retries
+
+All three trigger retries.
+
+## The duplicate-delivery trap
+
+The trickiest case is when your endpoint **did** succeed but Reader thought it didn't. For example:
+
+1. Reader POSTs the event
+2. Your handler processes it, writes to the database, returns 200
+3. The response packet is dropped on the network path back to Reader
+4. Reader times out, schedules a retry
+5. Reader POSTs again: duplicate delivery, but your first attempt really did run
+
+Without idempotency, you now have double-written state. With idempotency, the retry is a no-op.
+
+## The idempotency key
+
+Every delivery includes a unique `X-Reader-Delivery` header, a UUID that's stable across retries of the **same** delivery. Use it as your dedupe key.
+
+```ts
+app.post("/hooks/reader", express.raw({ type: "application/json" }), async (req, res) => {
+  const deliveryId = req.headers["x-reader-delivery"] as string;
+
+  // 1. Check if we've already processed this delivery
+  const alreadyProcessed = await db.deliveries.findOne({ id: deliveryId });
+  if (alreadyProcessed) {
+    // Already handled: return 200 so Reader stops retrying
+    return res.status(200).end();
+  }
+
+  try {
+    // 2. Process the event
+    verify(req, process.env.READER_WEBHOOK_SECRET!);
+    const payload = JSON.parse(req.body.toString());
+    await handleEvent(req.headers["x-reader-event"] as string, payload);
+
+    // 3. Record that we processed it
+    await db.deliveries.insertOne({
+      id: deliveryId,
+      processedAt: new Date(),
+    });
+
+    res.status(200).end();
+  } catch (err) {
+    // Return 5xx so Reader retries
+    res.status(500).end();
+  }
+});
+```
+
+## Transactional recording
+
+The robust pattern: record the delivery ID **in the same transaction** as the side effect. That way, either both happen or neither does.
+
+```ts
+await db.$transaction(async (tx) => {
+  await tx.deliveries.create({ data: { id: deliveryId } });
+  await tx.scrapeResults.createMany({ data: results });
+});
+```
+
+If the transaction fails, you return 5xx, Reader retries, and your next attempt will see no record of the delivery and retry the whole insert.
+
+## Returning 200 quickly
+
+Reader gives you 10 seconds. If your event handler does slow work (embedding text, calling other APIs, running LLMs), push it into a queue and return 200 immediately.
+
+```ts
+app.post("/hooks/reader", async (req, res) => {
+  verify(req, secret);
+
+  // Push to queue and return immediately
+  await jobQueue.enqueue({
+    type: "reader-event",
+    deliveryId: req.headers["x-reader-delivery"],
+    payload: JSON.parse(req.body.toString()),
+  });
+
+  res.status(200).end();
+});
+```
+
+Your queue workers pick it up and do the slow work on their own time. The queue's own idempotency (e.g., SQS dedupe, Redis SET NX on the delivery ID) handles duplicates.
+
+## Monitoring failed deliveries
+
+The webhook's `deliveryStats` field tracks:
+
+- `totalAttempts`: every attempt Reader has made
+- `failedDeliveries`: how many of those exhausted retries without success
+- `lastDeliveryAt` and `lastDeliveryStatus`
+
+The dashboard shows the same info visually. If `failedDeliveries` is climbing, your endpoint has a problem; investigate before the next batch silently drops.
+
+## Next
+
+- [Verifying webhook signatures](/home/guides/async-workflows/verifying-webhooks)
+- [Reliable batch processing](/home/guides/async-workflows/reliable-batch)

@@ -1,0 +1,123 @@
+---
+title: "Formats and extraction"
+description: "What Reader returns, how to shape it, and how to trim boilerplate."
+---
+
+Reader turns HTML into something an LLM (or your code) can actually read. You control two things: the **format** Reader gives you back, and how aggressively it **extracts** the meaningful part of the page.
+
+## Formats
+
+Pass `formats` on the request to choose what comes back:
+
+| Value | What you get |
+| --- | --- |
+| `"markdown"` (default) | Clean, structured markdown. Headings, lists, links, code blocks preserved. Best for LLMs and RAG. |
+| `"html"` | The cleaned HTML Reader used as the source for markdown conversion. Useful when you need to run your own DOM parsing. |
+
+Every response also includes `rawHtml` — the unprocessed HTML exactly as the browser rendered it, before any cleaning or content extraction. This is always returned regardless of `formats`.
+
+You can request both:
+
+```json
+{
+  "url": "https://example.com",
+  "formats": ["markdown", "html"]
+}
+```
+
+The response includes whichever fields you asked for:
+
+```json
+{
+  "data": {
+    "url": "https://example.com",
+    "rawHtml": "<html><head>...</head><body>...</body></html>",
+    "markdown": "# Example Domain\n\n...",
+    "html": "<h1>Example Domain</h1>...",
+    "metadata": { /* ... */ }
+  }
+}
+```
+
+## Main content extraction
+
+By default Reader strips away navigation, footers, sidebars, cookie banners, newsletter pop-ups, and other boilerplate, keeping just the article body. This is the `onlyMainContent: true` default.
+
+Turn it off when you need the whole page:
+
+```json
+{ "url": "...", "onlyMainContent": false }
+```
+
+When to turn it off:
+
+- You want the nav bar's links (e.g., to find related pages)
+- You're scraping a landing page where there is no "article"
+- You're debugging why something was stripped
+
+When to leave it on (most of the time):
+
+- LLM pipelines: boilerplate is noise and tokens
+- RAG indexing: you don't want "Cookie Settings" matching your user's query
+- Clean markdown output for humans
+
+## Include and exclude selectors
+
+For finer control, give Reader a list of CSS selectors to keep or drop. These compose with `onlyMainContent`.
+
+```json
+{
+  "url": "https://example.com",
+  "includeTags": ["article", "main.content"],
+  "excludeTags": [".ads", "#newsletter-modal", "aside"]
+}
+```
+
+- `includeTags`: keep only content matching these selectors. Everything else is dropped.
+- `excludeTags`: drop anything matching these, keep the rest.
+
+If you pass both, `includeTags` runs first, then `excludeTags` trims what remains.
+
+## Wait for a selector
+
+Dynamic pages sometimes render the real content a moment after the initial load. For example, a product grid that's hydrated from JSON. Tell Reader to wait for a specific selector before capturing:
+
+```json
+{
+  "url": "https://shop.example.com/search?q=phone",
+  "waitForSelector": ".product-card"
+}
+```
+
+Reader returns once that selector appears or the per-request `timeoutMs` is hit, whichever comes first.
+
+## What's in `metadata`
+
+Every scrape result includes metadata about the page and the request:
+
+```json
+{
+  "metadata": {
+    "title": "Example Domain",
+    "description": "This domain is for illustrative examples.",
+    "statusCode": 200,
+    "duration": 487,
+    "cached": false,
+    "proxyMode": "standard",
+    "proxyEscalated": false,
+    "scrapedAt": "2026-04-04T12:00:00Z"
+  }
+}
+```
+
+- `title`, `description`: extracted from `<title>`, `<meta>` tags, or Open Graph data
+- `statusCode`: what the target site returned
+- `duration`: how long Reader spent on the request, in ms
+- `cached`: whether the content was served from Reader's cache
+- `proxyMode`, `proxyEscalated`: see [Proxy modes](/home/concepts/proxy-modes)
+- `scrapedAt`: when the content was captured
+
+## Next
+
+- [Proxy modes](/home/concepts/proxy-modes): how Reader decides to fetch a page
+- [Caching](/home/concepts/caching): when to reuse a previous result

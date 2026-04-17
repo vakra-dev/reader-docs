@@ -1,0 +1,87 @@
+---
+title: "Proxy modes"
+description: "Three ways Reader can fetch a page: standard, stealth, and auto. Pick one, or let Reader decide."
+---
+
+Not every page is equally easy to fetch. A static blog post loads in a hundred milliseconds. A product detail page behind aggressive bot protection might refuse you three times before finally serving content. Reader handles both. You pick how.
+
+## The three modes
+
+| Mode | What it's for | Cost | Typical latency |
+| --- | --- | --- | --- |
+| `standard` | Fast and affordable. Works for the vast majority of the web: blogs, docs, news, APIs, marketing pages. | **1 credit** per page | Fast |
+| `stealth` | Bypasses aggressive bot walls. Use when `standard` gets blocked. | **3 credits** per page | Slower |
+| `auto` (default) | Reader picks. Starts with `standard` and escalates to `stealth` only if a block is detected. | Billed per mode actually used | Varies |
+
+You set the mode with `proxyMode` on the request:
+
+```json
+{
+  "url": "https://shop.example.com/item/42",
+  "proxyMode": "auto"
+}
+```
+
+Omit `proxyMode` entirely and Reader defaults to `auto`. This is the recommended default for 95% of use cases.
+
+## How `auto` works
+
+When you request `auto`, Reader tries `standard` first. If the page comes back clean, you're billed 1 credit and done. If the response looks like a block (a CAPTCHA, a 403 with a challenge page, a CDN bot wall), Reader retries with `stealth` automatically and you're billed 3 credits for that page.
+
+You can see what actually happened in the response:
+
+```json
+{
+  "data": {
+    "url": "https://shop.example.com/item/42",
+    "markdown": "...",
+    "metadata": {
+      "proxyMode": "stealth",
+      "proxyEscalated": true,
+      "duration": 2341
+    }
+  }
+}
+```
+
+- `metadata.proxyMode` is **always the mode that actually ran**: `"standard"` or `"stealth"`, never `"auto"`.
+- `metadata.proxyEscalated` is `true` only when `auto` escalated from standard to stealth. For explicit mode requests it's always `false`.
+
+Track `proxyEscalated` in your logs if you want to understand which sites are bot-walled; they'll flag themselves.
+
+## When to override `auto`
+
+Most callers never should. But there are two cases where it helps:
+
+**Force `stealth` when you already know the site is hostile.** Amazon product pages, LinkedIn profiles, booking sites, many e-commerce platforms, most "big social" networks: `auto` will eventually land on `stealth` for these anyway, but forcing it skips the wasted `standard` attempt and gets you clean data on the first try.
+
+**Force `standard` when you want to guarantee the cheaper tier.** If you're running a 100k-URL batch against a known-friendly site (your own blog, a partner's docs, a public API) and you want to cap spend at exactly 1 credit per page, set `proxyMode: "standard"` explicitly. You'll get an error response instead of a `stealth` escalation if anything does get blocked, and you can decide what to do case by case.
+
+For a deeper decision guide, see [Choosing a proxy mode](/home/guides/advanced/choosing-a-proxy-mode).
+
+## Pre-flight credit checks
+
+Reader checks your balance before the scrape runs:
+
+- **Explicit `stealth`**: rejected upfront if your balance is below 3 credits per page.
+- **`standard` or `auto`**: rejected upfront if your balance is below 1 credit per page (the optimistic cost).
+
+If `auto` escalates mid-request and the true cost comes out to 3x what the pre-flight estimated, the charge still goes through, and your balance can briefly go negative on the last request of a burst. Your next request gets a `402 insufficient_credits` error until you top up or your credits reset. This matches how most metered billing systems work.
+
+## Cache hits are free
+
+A scrape served from cache is **0 credits regardless of mode**. If the cached version was captured with `standard` and you now ask for it with `stealth`, Reader still serves the cached copy and bills you nothing. The mode you requested only matters when Reader has to actually fetch the page.
+
+See [Caching](/home/concepts/caching) for how keys and TTLs work.
+
+## What the mode does not control
+
+- **Content extraction**: `onlyMainContent`, `includeTags`, `excludeTags` work identically across all modes
+- **Formats**: `markdown` and `html` are available in every mode
+- **Rendering**: whether a page needs JavaScript execution is decided by Reader internally; it's not something you toggle alongside `proxyMode`
+
+## Next
+
+- [Choosing a proxy mode](/home/guides/advanced/choosing-a-proxy-mode): the practical decision guide
+- [Credits and billing](/home/concepts/credits-and-billing): what each mode costs
+- [Caching](/home/concepts/caching): free cache hits

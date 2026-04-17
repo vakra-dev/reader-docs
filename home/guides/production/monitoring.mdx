@@ -1,0 +1,110 @@
+---
+title: "Monitoring Reader in production"
+description: "The metrics worth tracking, where to get them, and what to alert on."
+---
+
+Reader is a dependency like any other. You want to know when it's slow, failing, or costing more than you budgeted. This guide covers the minimum set of metrics worth tracking and how to pull them.
+
+## Metrics to track
+
+| Metric | Source | Why |
+| --- | --- | --- |
+| Success rate (%) | Your own logs / Reader dashboard | Health signal; drops mean something is wrong |
+| p50 / p95 / p99 latency | Your own timings on each `/v1/read` | User experience in interactive paths |
+| Credit spend per hour | `/v1/usage/history` or local counter | Catches runaway spend before your limit |
+| Credits remaining | `/v1/usage/credits` | Exhaustion early warning |
+| `rate_limited` error count | Your logs | Capacity planning, upgrade signal |
+| `upstream_unavailable` rate | Your logs | Target-site health signal |
+| Webhook delivery failures | Webhook `deliveryStats` | Detect broken listener endpoints |
+| Escalation rate (auto → stealth) | `metadata.proxyEscalated` on each response | Helps you decide when to force a mode |
+
+## Pulling data from Reader
+
+### Usage history
+
+`GET /v1/usage/history` returns recent requests with per-row `proxyMode`, `credits`, `status`, and `duration`. Paginate through and feed into whatever your observability stack is (Datadog, Grafana, a local Postgres, a spreadsheet).
+
+```ts
+async function streamUsageHistory(since: Date) {
+  let skip = 0;
+  const limit = 100;
+  while (true) {
+    const envelope = await client.request(
+      "GET",
+      `/v1/usage/history?skip=${skip}&limit=${limit}`,
+    );
+    for (const entry of envelope.data) {
+      if (new Date(entry.createdAt) < since) return;
+      yield entry;
+    }
+    if (!envelope.pagination.hasMore) return;
+    skip += limit;
+  }
+}
+```
+
+### Credits balance
+
+A one-call poll:
+
+```ts
+const { balance, limit, used, tier, resetAt } = await client.getCredits();
+metrics.gauge("reader.credits.balance", balance);
+metrics.gauge("reader.credits.used", used);
+```
+
+Scrape this on an interval (every minute or two is plenty) and graph it.
+
+## Instrumenting client calls
+
+Wrap your `client.read` calls in a metrics helper:
+
+```ts
+async function trackedRead(params) {
+  const start = Date.now();
+  let status = "success";
+  let code = null;
+
+  try {
+    const result = await client.read(params);
+    return result;
+  } catch (err) {
+    status = "error";
+    code = err.code ?? "unknown";
+    throw err;
+  } finally {
+    const duration = Date.now() - start;
+    metrics.timing("reader.read.duration", duration, { status });
+    metrics.increment("reader.read.requests", { status, code });
+  }
+}
+```
+
+## Alerts worth having
+
+- **Error rate > 5%** over a 5-minute window → investigate
+- **Credit balance < 20% of limit** → notify ops
+- **p95 latency doubles** → slowdown or escalation spike
+- **`rate_limited` count > 10 per minute** → need to upgrade or throttle
+- **Webhook `failedDeliveries` rising** → your listener is broken
+
+Don't alert on single-request failures. Reader will occasionally see target-site timeouts and that's normal.
+
+## Request ID correlation
+
+Every response (success or error) carries an `x-request-id` header. Log it on every call. When something goes wrong, include the request ID in your bug report. Reader's server-side logs key off that ID and we can reconstruct what happened.
+
+```ts
+const res = await fetch(url, { ... });
+const requestId = res.headers.get("x-request-id");
+log.info({ requestId, url, status: res.status }, "reader request");
+```
+
+## Dashboard shortcut
+
+The Reader dashboard shows most of these metrics without any instrumentation. Check there first for ad-hoc investigations; build your own tracking for alerts and long-term capacity planning.
+
+## Next
+
+- [Cost estimation](/home/guides/production/cost-estimation)
+- [Retry and error handling](/home/guides/production/retry-error-handling)

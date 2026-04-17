@@ -1,0 +1,75 @@
+---
+title: "Waiting for dynamic content"
+description: "Use waitForSelector when content is hydrated client-side after initial load."
+---
+
+Modern single-page apps don't render content until JavaScript runs and data arrives. If you scrape the initial HTML you get a skeleton: loading spinners, empty divs, maybe a `<noscript>` fallback. You want what the page looks like *after* hydration.
+
+## The `waitForSelector` option
+
+Tell Reader to wait for a specific element to appear before capturing:
+
+```ts
+const result = await client.read({
+  url: "https://shop.example.com/search?q=phone",
+  waitForSelector: ".product-card",
+});
+```
+
+Reader loads the page, waits for `.product-card` to exist in the DOM, then captures the content. If the selector shows up within `timeoutMs` (default 30 seconds), you get the post-hydration page. If not, the scrape times out.
+
+## Picking the right selector
+
+Open the target page in your browser. Wait for it to fully load. Pick a selector that's:
+
+- **Inside** the content you care about (so you know the real content has arrived, not just the shell)
+- **Stable** across page variants (if you're scraping many similar URLs)
+- **Late-loading** (it should only appear once the hydration has actually completed)
+
+Bad selectors:
+
+- `body`: already exists before hydration, won't wait for anything
+- `.loading-spinner`: the opposite of what you want (would match *during* loading)
+- `#some-unique-id-that-changes-every-request`: won't match across pages
+
+Good selectors:
+
+- `[data-testid="product-list"]`: stable, semantic, only present post-hydration
+- `article .content`: semantic, broad enough to work across similar pages
+- `.search-results[data-loaded="true"]`: explicitly gated on a loaded flag
+
+## When `waitForSelector` isn't enough
+
+Some pages are hard for reasons selectors can't fix:
+
+- **Infinite scroll.** The content you want only appears after scrolling. Reader doesn't scroll; you'll only get the first viewport's worth.
+- **Pagination behind a button click.** Reader doesn't click; seed your batch with the individual page URLs directly.
+- **Content hidden behind auth.** Reader has no concept of your logged-in session. See [Auth walls](/home/guides/advanced/auth-walls) for options.
+
+## Combining with proxy modes
+
+Sites that hydrate dynamically *and* detect bots are harder still. `waitForSelector` gets you past the hydration; `proxyMode: "stealth"` (or `auto` with escalation) gets you past the bot detection. They work independently, and you might need both:
+
+```ts
+await client.read({
+  url: "https://shop.example.com/item/42",
+  waitForSelector: ".product-price",
+  proxyMode: "auto", // lets Reader escalate if the site blocks standard
+});
+```
+
+See [Choosing a proxy mode](/home/guides/advanced/choosing-a-proxy-mode) for when to force a mode explicitly.
+
+## Debugging a timeout
+
+If scrapes with `waitForSelector` consistently fail with `scrape_timeout`:
+
+1. **Test the selector manually.** Open the URL in your browser with devtools, wait for full load, then check whether the selector matches.
+2. **Bump `timeoutMs`.** Some sites are slow; 30 seconds may not be enough. Max is 120 seconds.
+3. **Try a more general selector.** Maybe your specific class name changed; use something broader.
+4. **Check if the page needs stealth mode.** Bot-walled pages may never fully hydrate for standard-mode traffic.
+
+## Next
+
+- [Auth walls](/home/guides/advanced/auth-walls)
+- [Choosing a proxy mode](/home/guides/advanced/choosing-a-proxy-mode)

@@ -1,0 +1,86 @@
+---
+title: "Crawling a website"
+description: "Start with one URL, let Reader discover the rest."
+---
+
+Use crawl mode when you want to index an entire site but don't have a URL list to start with. Reader follows links from a seed URL up to depth and page limits you set.
+
+## The basic request
+
+```ts
+const result = await client.read({
+  url: "https://docs.example.com",
+  maxDepth: 3,
+  maxPages: 200,
+});
+
+if (result.kind === "job") {
+  for (const page of result.data.results) {
+    console.log(page.url, page.markdown?.length);
+  }
+}
+```
+
+Reader will start at the seed URL, extract links from each page, follow them up to `maxDepth` levels deep, and stop when it hits `maxPages`.
+
+## Depth vs pages
+
+Both limits matter:
+
+- **`maxDepth`**: how many link-hops away from the seed Reader will explore. `maxDepth: 1` means "seed + all pages linked directly from the seed". `maxDepth: 2` includes pages linked from those, and so on.
+- **`maxPages`**: total pages to scrape, regardless of depth. Acts as a safety cap.
+
+Whichever limit is hit first stops the crawl. For typical documentation sites, `maxDepth: 3` and `maxPages: 200` is a reasonable starting point.
+
+## Same-host only
+
+Crawls stay on the seed URL's host. A seed of `https://docs.example.com` follows links within `docs.example.com` but ignores links to `example.com`, `blog.example.com`, or anywhere else. If you need cross-host discovery, you'll have to seed each host separately.
+
+## Watching progress
+
+Crawls can take a while. Use SSE or polling to track:
+
+```ts
+// Kick off the crawl but don't wait
+const res = await fetch("https://api.reader.dev/v1/read", {
+  method: "POST",
+  headers: {
+    "Content-Type": "application/json",
+    "x-api-key": process.env.READER_KEY!,
+  },
+  body: JSON.stringify({
+    url: "https://docs.example.com",
+    maxPages: 500,
+  }),
+});
+const { data: job } = await res.json();
+
+// Stream progress
+for await (const event of client.stream(job.id)) {
+  if (event.type === "page") {
+    console.log("discovered:", event.data.url);
+  }
+  if (event.type === "progress") {
+    console.log(`progress: ${event.completed}/${event.total}`);
+  }
+  if (event.type === "done") break;
+}
+```
+
+Note: during a crawl, `total` changes as Reader discovers more pages. The final number is only known once the crawl finishes.
+
+## When to crawl vs batch-scrape
+
+- **Crawl** when the site doesn't expose a sitemap, or you want every reachable page from a starting point.
+- **Batch-scrape** when you can get a URL list some other way (sitemap.xml, API, RSS). It's cheaper, faster, and gives you exact control over what gets fetched.
+
+Fetching the sitemap and batch-scraping is almost always preferable when it's available. See [Scrape vs crawl](/home/concepts/scrape-vs-crawl) for the decision tree.
+
+## Cost
+
+Crawls bill 1 credit per page discovered and scraped, flat. A 500-page crawl = 500 credits.
+
+## Next
+
+- [Crawl with scrape](/home/guides/advanced/crawl-with-scrape): content extraction on every crawled page
+- [Scrape vs crawl](/home/concepts/scrape-vs-crawl)

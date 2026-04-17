@@ -1,0 +1,89 @@
+---
+title: "Choosing a proxy mode"
+description: "A practical decision guide: when to use standard, stealth, or auto for different sites."
+---
+
+Most callers should leave `proxyMode` unset and let Reader default to `auto`. This guide is for the minority of cases where overriding pays off.
+
+## The default: `auto`
+
+Use `auto` unless you have a specific reason not to. It's free to use (same price as `standard` when the target is friendly, 3x when it needs to escalate) and it handles the mixed real-world case: some pages behave, some don't, and you don't have to think about which is which.
+
+```ts
+await client.read({ url }); // implicit proxyMode: "auto"
+```
+
+## When to force `standard`
+
+Force `proxyMode: "standard"` when:
+
+- **You know the target is friendly.** Your own blog, a partner's public docs, a government website, a content API. These don't need stealth; forcing standard saves you from paying 3x on an escalation you were never going to need.
+- **You want a cost guarantee.** With `standard` explicit, every scrape is exactly 1 credit. `auto` can surprise you with 3x credits if escalation kicks in. For a 10,000-URL batch where budget certainty matters, lock the mode.
+- **You want an error signal for blocks.** If you force `standard` and the target blocks you, Reader returns an error rather than silently escalating. You find out immediately that something changed, which is valuable when you're scraping a site you thought was friendly.
+
+```ts
+await client.read({
+  url: "https://docs.example.com/api/v1/reference",
+  proxyMode: "standard",
+});
+```
+
+## When to force `stealth`
+
+Force `proxyMode: "stealth"` when:
+
+- **The target is known-hostile.** Amazon, LinkedIn, booking sites, ticket resellers, most aggressive e-commerce. `auto` would escalate on these anyway, usually on the first page. Forcing stealth skips the wasted standard attempt and gets clean data on the first try.
+- **You're chasing a specific signal.** Sometimes a site blocks standard mode inconsistently: some pages work, others don't. Forcing stealth gives you a consistent experience across the batch.
+- **You tried `auto` and escalation is happening 80%+ of the time.** At that point you're paying the standard attempt as pure overhead. Switch to explicit stealth and save the wasted credits.
+
+```ts
+await client.read({
+  url: "https://www.amazon.com/dp/B08N5WRWNW",
+  proxyMode: "stealth",
+});
+```
+
+## Per-site cheat sheet
+
+| Site type | Recommended mode |
+| --- | --- |
+| Blogs, marketing sites, personal sites | `auto` (or `standard` for certainty) |
+| Documentation sites (most) | `auto` |
+| News sites (most) | `auto` |
+| Government, academic | `standard` |
+| Public APIs (JSON endpoints) | `standard` |
+| General e-commerce | `auto` |
+| Amazon product pages | `stealth` |
+| LinkedIn | `stealth` |
+| Booking / travel sites | `stealth` |
+| Social media (where accessible) | `stealth` |
+| Ticketing sites (StubHub, etc.) | `stealth` |
+
+## Per-URL override in a batch
+
+You can't set `proxyMode` per URL in a single batch; it applies to the whole batch. If you have a mixed list of friendly and hostile URLs, two options:
+
+1. **Pre-split the batch.** Route friendly URLs to a `standard` batch and hostile URLs to a `stealth` batch.
+2. **Run the whole batch through `auto`.** Pay the escalation cost for the hostile URLs and move on. If the friendly URLs are the majority, the average cost stays low.
+
+Option 2 is usually easier and the cost difference is small if most of your batch is friendly.
+
+## Measuring what `auto` is actually doing
+
+After a run, check the `metadata.proxyMode` on every result to see the distribution:
+
+```ts
+const escalated = result.data.results.filter((r) => r.proxyMode === "stealth").length;
+const total = result.data.results.length;
+console.log(`Escalation rate: ${((escalated / total) * 100).toFixed(0)}%`);
+```
+
+- **Under 10%:** `auto` is working well; leave it.
+- **10%–50%:** normal for mixed sites; leave it.
+- **Over 80%:** you're wasting standard attempts; switch to explicit `stealth`.
+
+## Next
+
+- [Proxy modes (concept)](/home/concepts/proxy-modes)
+- [Credits and billing](/home/concepts/credits-and-billing)
+- [Cost estimation](/home/guides/production/cost-estimation)

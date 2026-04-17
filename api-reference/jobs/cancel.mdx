@@ -1,0 +1,8 @@
+---
+title: "Cancel a job"
+openapi: "openapi.json DELETE /v1/jobs/{id}"
+---
+
+Stops a `queued` or `processing` job. Pages already completed stay in the results; Reader just stops scheduling new URLs.
+
+Calling cancel on a job that's already `completed`, `failed`, or `cancelled` returns `409 conflict`.

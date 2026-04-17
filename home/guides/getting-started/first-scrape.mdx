@@ -1,0 +1,98 @@
+---
+title: "Your first scrape"
+description: "Make a single-URL request and understand every field in the response."
+---
+
+The shortest possible Reader request is a single URL. Let's make one, walk through what comes back, and know what each field means.
+
+## Get a key
+
+Sign up at [app.reader.dev](https://app.reader.dev) (free tier: 1,000 credits/month, no card). Copy your API key from the dashboard; it starts with `rdr_`.
+
+```bash
+export READER_KEY="rdr_your_key"
+```
+
+## Make the request
+
+```bash
+curl -X POST https://api.reader.dev/v1/read \
+  -H "x-api-key: $READER_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{ "url": "https://example.com" }'
+```
+
+Or with the JS SDK:
+
+```ts
+import { ReaderClient } from "@vakra-dev/reader-js";
+
+const client = new ReaderClient({ apiKey: process.env.READER_KEY! });
+const result = await client.read({ url: "https://example.com" });
+
+if (result.kind === "scrape") {
+  console.log(result.data.markdown);
+}
+```
+
+Or Python:
+
+```python
+from reader_py import ReaderClient
+
+client = ReaderClient(api_key=os.environ["READER_KEY"])
+result = client.read(url="https://example.com")
+
+if result.kind == "scrape":
+    print(result.data.markdown)
+```
+
+## The response
+
+```json
+{
+  "success": true,
+  "data": {
+    "url": "https://example.com",
+    "rawHtml": "<html><head><title>Example Domain</title>...</head><body>...</body></html>",
+    "markdown": "# Example Domain\n\nThis domain is for use in illustrative examples...",
+    "metadata": {
+      "title": "Example Domain",
+      "description": null,
+      "statusCode": 200,
+      "duration": 487,
+      "cached": false,
+      "proxyMode": "standard",
+      "proxyEscalated": false,
+      "scrapedAt": "2026-04-04T12:00:00Z"
+    }
+  }
+}
+```
+
+Field-by-field:
+
+- `success: true`: the response envelope shape. Errors have `success: false`.
+- `data.url`: canonical URL after any redirects
+- `data.markdown`: the content, cleaned and converted to markdown
+- `metadata.title` / `description`: extracted from the page's `<title>` and `<meta>` tags
+- `metadata.statusCode`: HTTP status the target site returned
+- `metadata.duration`: milliseconds Reader spent on the scrape
+- `metadata.cached`: `true` if this came from cache (free), `false` if it was a fresh fetch
+- `metadata.proxyMode`: which mode actually ran. See [Proxy modes](/home/concepts/proxy-modes).
+- `metadata.proxyEscalated`: `true` only when `auto` bumped from standard to stealth
+- `metadata.scrapedAt`: when the content was captured (on cache hits, this is the original capture time)
+
+## You just spent 1 credit
+
+By default Reader used `proxyMode: "auto"`, which started in standard (1 credit) and didn't need to escalate. Your balance dropped by 1. Check it:
+
+```bash
+curl https://api.reader.dev/v1/usage/credits -H "x-api-key: $READER_KEY"
+```
+
+## What's next
+
+- Try [requesting HTML alongside markdown](/home/guides/getting-started/markdown-and-html)
+- [Strip unwanted boilerplate](/home/guides/getting-started/main-content)
+- [Fetch many URLs at once](/home/guides/advanced/batch-scraping)

@@ -1,0 +1,131 @@
+---
+title: "Proxy Tiers"
+description: "Datacenter vs residential proxies, rotation, and automatic escalation."
+---
+
+Proxies are how Reader scrapes sites that would otherwise block or rate-limit a single IP. Reader supports **two tiers** with very different cost and capability profiles, and a unified API for using them together.
+
+## The two tiers
+
+### Datacenter
+
+- **Fast** (~50-100ms overhead per request)
+- **Cheap** (pennies per GB)
+- **Easily detected** by sophisticated anti-bot systems - the IP range is a known datacenter
+- **Great for**: APIs, blogs, docs, news sites, anything without aggressive bot protection
+
+### Residential
+
+- **Slow** (300-800ms overhead per request)
+- **Expensive** (dollars per GB)
+- **Indistinguishable from a real user** - the IP is a real home ISP
+- **Great for**: Amazon, LinkedIn, ticketing sites, anything that aggressively blocks datacenters
+
+You'll use datacenter for 95% of requests and residential only when necessary. The goal of Reader's multi-tier support is to make that split automatic.
+
+## Configuring both tiers
+
+```javascript
+const reader = new ReaderClient({
+  proxyPools: {
+    datacenter: [
+      { url: "http://user:pass@dc1.example.com:8080" },
+      { url: "http://user:pass@dc2.example.com:8080" },
+    ],
+    residential: [
+      {
+        type: "residential",
+        host: "residential.proxy-provider.com",
+        port: 12321,
+        username: "customer-abc",
+        password: "secret",
+        country: "us",
+      },
+    ],
+  },
+});
+```
+
+Both pools can have any number of proxies. Rotation within a tier is round-robin by default (or `random` via `proxyRotation`).
+
+## Tier selection per request
+
+Three modes:
+
+### Explicit datacenter
+
+```javascript
+await reader.scrape({
+  urls: ["https://news.example.com/article"],
+  proxyTier: "datacenter",
+});
+```
+
+Always pulls from the datacenter pool. Cheapest option - use when you know the target doesn't need residential.
+
+### Explicit residential
+
+```javascript
+await reader.scrape({
+  urls: ["https://www.amazon.com/dp/B08N5WRWNW"],
+  proxyTier: "residential",
+});
+```
+
+Always pulls from the residential pool. Use when you know the target needs residential - don't waste credits trying datacenter first.
+
+### Auto (recommended)
+
+```javascript
+await reader.scrape({
+  urls: ["https://linkedin.com/in/someone"],
+  proxyTier: "auto",
+});
+```
+
+Starts with **datacenter**. If the request is blocked (detected via status codes, challenge pages, or specific block patterns), Reader **escalates to residential** on a retry. You pay datacenter cost for 95% of URLs and residential cost only for the ones that actually need it.
+
+## Sticky sessions for residential
+
+Residential proxies are typically billed per-request AND per-IP - cycling IPs on every request is wasteful and also tends to trigger anti-bot systems (real users don't jump IPs mid-session).
+
+Reader handles this with **sticky sessions**: for residential proxies, Reader generates a unique session ID and passes it to the proxy provider in the URL:
+
+```
+http://customer-abc_session-hero_1234567_abc_country-us:secret@residential.proxy-provider.com:12321
+```
+
+The `session-hero_...` parameter tells the provider "keep this IP for this session." All requests in the same crawl session use the same IP, mimicking a real user.
+
+## Flat proxy list (legacy)
+
+If you only have one tier of proxies, use the flat `proxies` option instead of `proxyPools`:
+
+```javascript
+const reader = new ReaderClient({
+  proxies: [
+    { host: "dc1.example.com", port: 8080, username: "u", password: "p" },
+    { host: "dc2.example.com", port: 8080, username: "u", password: "p" },
+  ],
+  proxyRotation: "round-robin",
+});
+```
+
+No tier selection - every request rotates through the flat pool. Simpler but less flexible than multi-tier pools.
+
+## Per-crawl stickiness
+
+During a `crawl()` session, Reader picks **one proxy at the start** and uses it for every request in that crawl. Rotating mid-crawl would trigger anti-bot systems on sites that track session continuity.
+
+If you want different crawls to use different proxies, just call `crawl()` multiple times - each invocation picks a fresh proxy from the pool.
+
+## Where to go next
+
+<CardGroup cols={2}>
+  <Card title="Proxy Configuration guide" icon="network-wired" href="/self-hosted/guides/proxy-configuration">
+    Practical setup for single proxies, pools, and escalation.
+  </Card>
+  <Card title="Scraping Engine" icon="layer-group" href="/self-hosted/concepts/engine-waterfall">
+    How the Hero engine and proxy escalation work together.
+  </Card>
+</CardGroup>

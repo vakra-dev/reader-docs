@@ -1,0 +1,94 @@
+---
+title: "Crawling"
+description: "How Reader discovers and optionally scrapes every page on a site."
+---
+
+Crawling in Reader means: start at a seed URL, discover links via BFS, and optionally scrape every discovered page. It's a link-discovery primitive first, with scraping as an opt-in add-on.
+
+## The `crawl()` primitive
+
+```javascript
+const result = await reader.crawl({
+  url: "https://docs.example.com",
+  depth: 2,
+  maxPages: 50,
+});
+
+console.log(`Found ${result.urls.length} pages`);
+for (const page of result.urls) {
+  console.log(`  ${page.url} - ${page.title}`);
+}
+```
+
+This does link discovery only. You get back a list of `{ url, title, description }` entries for every discovered page, but no content.
+
+## Crawl and scrape in one call
+
+Set `scrape: true` to scrape every discovered page as it's found:
+
+```javascript
+const result = await reader.crawl({
+  url: "https://docs.example.com",
+  depth: 2,
+  maxPages: 50,
+  scrape: true,
+  scrapeConcurrency: 3,
+});
+
+console.log(`Discovered: ${result.urls.length}`);
+console.log(`Scraped:    ${result.scraped?.batchMetadata.successfulUrls}`);
+```
+
+`result.scraped` is a full `ScrapeResult` with markdown for every page.
+
+## How the BFS works
+
+Reader uses breadth-first search starting from the seed URL:
+
+1. **Fetch the seed** and extract all links via DOM parsing (linkedom).
+2. **Filter** the links: same domain, not already visited, matches `includePatterns`, doesn't match `excludePatterns`, not blocked by robots.txt.
+3. **Enqueue** matching links at `depth + 1` if `depth < maxDepth`.
+4. **Rate limit** - wait `delayMs` (default 1000ms) before the next request.
+5. **Stop** when the queue is empty or `maxPages` is hit.
+
+The result is deterministic given the same seed and filters. Link order within a page is preserved, so the first `maxPages` you get are the same on every run.
+
+## Crawl control
+
+| Option | Default | Purpose |
+|---|---|---|
+| `depth` | `1` | Max hops from the seed URL |
+| `maxPages` | `20` | Stop after N pages regardless of depth |
+| `delayMs` | `1000` | Rate limit between requests |
+| `includePatterns` | `[]` | Regex - URL must match at least one |
+| `excludePatterns` | `[]` | Regex - URL must not match any |
+
+A common pattern: scope a crawl to a docs subdirectory with `includePatterns`:
+
+```javascript
+await reader.crawl({
+  url: "https://docs.example.com",
+  depth: 5,
+  maxPages: 200,
+  includePatterns: ["^https://docs\\.example\\.com/api/"],
+});
+```
+
+## Same-domain only
+
+Crawling is constrained to the seed's domain. Reader does not follow external links - that would explode the crawl scope and credits unpredictably. If you need cross-domain discovery, build it yourself by calling `crawl()` for each domain separately.
+
+## Sticky proxy per crawl
+
+When you configure proxy pools, Reader picks **one proxy at the start of a crawl session** and uses it for every request in that crawl. This mimics how a real user would browse a site from a single IP - rotating IPs mid-crawl tends to trip anti-bot systems. See [Proxy Tiers](/self-hosted/concepts/proxy-tiers).
+
+## Where to go next
+
+<CardGroup cols={2}>
+  <Card title="Website Crawling guide" icon="sitemap" href="/self-hosted/guides/website-crawling">
+    Patterns for scoping, filtering, and scraping crawls.
+  </Card>
+  <Card title="CrawlOptions reference" icon="book" href="/self-hosted/api-reference/crawl-options">
+    Every option, every default.
+  </Card>
+</CardGroup>

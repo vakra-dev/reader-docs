@@ -1,0 +1,71 @@
+---
+title: "Scraping"
+description: "How Reader turns a URL into clean, LLM-ready content."
+---
+
+Scraping in Reader means: fetch a URL, render it (if needed), extract the main content, and convert it to clean markdown.
+
+Under the hood this is a four-step pipeline:
+
+1. **Fetch** - Reader renders the page in a headless Chrome browser (Hero engine) with JavaScript execution, TLS fingerprinting, and proxy routing. See [Scraping Engine](/self-hosted/concepts/engine-waterfall).
+2. **Extract** - Reader identifies the main content area (article, main, largest text block), removes navigation, footers, sidebars, ads, and hidden elements.
+3. **Convert** - the cleaned HTML is converted to markdown via supermarkdown (a Rust-backed converter optimized for LLM input).
+
+## The `scrape()` primitive
+
+`scrape()` takes one or more URLs and returns a `ScrapeResult`:
+
+```javascript
+const result = await reader.scrape({
+  urls: ["https://example.com"],
+  formats: ["markdown"],
+});
+
+console.log(result.data[0].markdown);
+```
+
+For a single URL, the call runs synchronously. For multiple URLs, set `batchConcurrency` to process them in parallel - see [Batch Scraping](/self-hosted/guides/batch-scraping).
+
+## Output formats
+
+Reader supports two output formats:
+
+- **`markdown`** - cleaned, LLM-optimized markdown (default)
+- **`html`** - the cleaned HTML that markdown was generated from
+
+You can request both in a single call:
+
+```javascript
+const result = await reader.scrape({
+  urls: ["https://example.com"],
+  formats: ["markdown", "html"],
+});
+
+console.log(result.data[0].markdown);
+console.log(result.data[0].html);
+```
+
+Every result also includes `metadata` regardless of format, with the title, description, canonical URL, favicon, Open Graph tags, and Twitter Card tags.
+
+## What scraping is not
+
+- **Crawling** - `scrape()` only visits URLs you explicitly pass. It does not discover links. For that, use [`crawl()`](/self-hosted/concepts/crawling).
+- **Screenshots or PDFs** - Reader is text-first. It does not produce rendered images of pages.
+- **A JavaScript execution environment** - while `hero` runs JavaScript, Reader doesn't expose the page object or let you run arbitrary browser scripts. It's a scraping tool, not a general-purpose browser automation framework.
+
+## Where to go next
+
+<CardGroup cols={2}>
+  <Card title="Content Extraction" icon="scissors" href="/self-hosted/concepts/content-extraction">
+    How Reader decides what to keep and what to strip.
+  </Card>
+  <Card title="Scraping Engine" icon="layer-group" href="/self-hosted/concepts/engine-waterfall">
+    How the Hero engine and proxy escalation work.
+  </Card>
+  <Card title="Basic Scraping guide" icon="bolt" href="/self-hosted/guides/basic-scraping">
+    Practical recipes and patterns.
+  </Card>
+  <Card title="ScrapeOptions reference" icon="book" href="/self-hosted/api-reference/scrape-options">
+    Every option, every default.
+  </Card>
+</CardGroup>

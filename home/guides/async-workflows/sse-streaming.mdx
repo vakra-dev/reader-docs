@@ -1,0 +1,89 @@
+---
+title: "Streaming jobs with SSE"
+description: "Real-time progress from a single open HTTP connection."
+---
+
+Server-Sent Events (SSE) let you watch a job make progress without repeatedly polling. You open one HTTP connection and Reader pushes events as pages complete.
+
+## The per-job stream
+
+```ts
+for await (const event of client.stream(jobId)) {
+  switch (event.type) {
+    case "progress":
+      console.log(`${event.completed}/${event.total}`);
+      break;
+    case "page":
+      console.log("page done:", event.data.url);
+      break;
+    case "error":
+      console.error("page failed:", event.url, event.error);
+      break;
+    case "done":
+      console.log("job finished:", event.status);
+      return;
+  }
+}
+```
+
+The SDK's `stream()` method wraps the raw SSE protocol as an async generator. Events you'll see:
+
+- `progress`: periodic status updates with `completed` / `total`
+- `page`: one per page as it finishes (full scrape result with metadata)
+- `error`: one per failed page
+- `done`: final event, stream closes
+
+## Raw SSE from fetch
+
+If you want to consume the stream without the SDK:
+
+```ts
+const res = await fetch(`https://api.reader.dev/v1/jobs/${jobId}/stream`, {
+  headers: { "x-api-key": process.env.READER_KEY! },
+});
+
+const reader = res.body!.pipeThrough(new TextDecoderStream()).getReader();
+let buffer = "";
+
+while (true) {
+  const { value, done } = await reader.read();
+  if (done) break;
+  buffer += value;
+
+  // SSE frames are separated by blank lines
+  let idx;
+  while ((idx = buffer.indexOf("\n\n")) !== -1) {
+    const frame = buffer.slice(0, idx);
+    buffer = buffer.slice(idx + 2);
+
+    const eventMatch = frame.match(/^event: (.*)$/m);
+    const dataMatch = frame.match(/^data: (.*)$/m);
+    if (eventMatch && dataMatch) {
+      const type = eventMatch[1];
+      const data = JSON.parse(dataMatch[1]);
+      console.log(type, data);
+    }
+  }
+}
+```
+
+## When SSE beats polling
+
+- **Real-time UI.** You're showing the user a live progress bar; SSE gives you immediate updates without polling overhead.
+- **One long job.** For a 500-page crawl that takes 10 minutes, SSE is one connection instead of 300 poll requests.
+- **You want per-page results as they finish.** The `page` event delivers each result in real time, useful for streaming-style pipelines.
+
+## When SSE doesn't fit
+
+- **Offline / batch processing.** If your worker goes down mid-stream, you lose progress visibility. Use webhooks.
+- **Many jobs in parallel.** Opening 50 concurrent SSE connections is a lot of open TCP connections. Use the [workspace-wide stream](/home/concepts/events#workspace-stream) or webhooks instead.
+- **Serverless functions with short timeouts.** SSE wants a long-lived connection; serverless wants short invocations. Webhooks are the better fit there.
+
+## Keep-alives
+
+Reader sends a comment line (`: ping\n\n`) every 30 seconds to keep intermediate proxies from dropping idle connections. Most SSE parsers ignore comments by default; if yours doesn't, filter them out.
+
+## Next
+
+- [Progress bars](/home/guides/async-workflows/progress-bars): SSE driving a UI
+- [Polling vs SSE vs webhooks](/home/guides/async-workflows/polling-vs-sse-vs-webhooks)

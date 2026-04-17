@@ -1,0 +1,125 @@
+---
+title: "Async jobs"
+description: "Batch and crawl return jobs. Poll them, stream them, or let a webhook call you when they're done."
+---
+
+Anything Reader can't return in a single HTTP round-trip comes back as a **job**. Jobs are long-running work Reader executes in the background: a batch of URLs, a crawl of a site, a retry of failed pages. You get a job ID immediately and watch it finish in one of three ways.
+
+## Lifecycle
+
+A job moves through these states:
+
+```
+queued → processing → completed
+                    ↘ failed
+                    ↘ cancelled
+```
+
+- **queued**: Reader has accepted the job but hasn't started yet. Usually brief.
+- **processing**: At least one URL is being fetched. Results start appearing in the `results` array as pages finish.
+- **completed**: All URLs attempted. Some may have errors, but the job finished its run.
+- **failed**: The whole job hit a fatal error before finishing (rare, usually an infrastructure issue).
+- **cancelled**: You called `DELETE /v1/jobs/{id}` and Reader stopped processing.
+
+## Job response shape
+
+```json
+{
+  "success": true,
+  "data": {
+    "id": "job_9fba2",
+    "status": "processing",
+    "mode": "batch",
+    "completed": 45,
+    "total": 100,
+    "creditsUsed": 45,
+    "error": null,
+    "results": [
+      {
+        "url": "https://example.com/page-1",
+        "markdown": "...",
+        "proxyMode": "standard",
+        "credits": 1,
+        "metadata": { "duration": 410, "statusCode": 200, "scrapedAt": "..." }
+      }
+    ],
+    "startedAt": "2026-04-04T12:00:00Z",
+    "completedAt": null,
+    "createdAt": "2026-04-04T11:59:58Z"
+  },
+  "pagination": { "total": 100, "skip": 0, "limit": 20, "hasMore": true }
+}
+```
+
+Each entry in `results` has the same page shape as a sync scrape result: same fields, same metadata. Code that handles one can handle the other.
+
+## Three ways to watch a job
+
+### 1. Poll
+
+Fetch `GET /v1/jobs/{id}` every few seconds until `status` is terminal. Simplest; best for short jobs and CLIs.
+
+```ts
+while (true) {
+  const { job } = await client.getJob(jobId);
+  if (["completed", "failed", "cancelled"].includes(job.status)) break;
+  await sleep(2000);
+}
+```
+
+The SDK's `waitForJob(id)` wraps this pattern and auto-collects paginated results when done.
+
+Costs: one API request per poll, which counts toward your RPM. Don't poll faster than you need to.
+
+### 2. Server-sent events (SSE)
+
+Open a stream to `GET /v1/jobs/{id}/stream` and receive events as the job makes progress:
+
+```
+event: progress
+data: {"status":"processing","completed":12,"total":100}
+
+event: page
+data: {"url":"...","markdown":"...","proxyMode":"standard","credits":1}
+
+event: done
+data: {"status":"completed","completed":100,"total":100}
+```
+
+Better than polling when you want real-time updates without hammering the API. One HTTP connection stays open for the duration of the job.
+
+### 3. Webhook
+
+Subscribe a webhook to `job.completed` and `job.failed` events. Reader calls your endpoint when the job terminates: no polling, no open connections.
+
+See [Webhooks](/home/concepts/webhooks) for the full contract and signing.
+
+## Picking a pattern
+
+| You want | Use |
+| --- | --- |
+| A quick script, a few small jobs | Poll |
+| A real-time progress bar in a UI | SSE |
+| Long-running batches you don't want to babysit | Webhook |
+| Fire-and-forget workloads on server infrastructure | Webhook |
+| Jobs that run while your process is offline | Webhook |
+
+You can also combine them. Most production setups use webhooks as the authoritative signal for completion and fall back to polling only when a webhook might have been missed.
+
+## Pagination
+
+`GET /v1/jobs/{id}` returns the job envelope plus `pagination` for the `results` array. Default limit is 20 per page, max 100. The SDK's `waitForJob` and `getAllJobResults` follow pagination automatically.
+
+## Cancellation
+
+`DELETE /v1/jobs/{id}` stops a queued or processing job. Any pages already completed stay in the results; Reader just stops scheduling new URLs. Calling cancel on a job that's already `completed`, `failed`, or `cancelled` returns `409 conflict`.
+
+## Retries
+
+`POST /v1/jobs/{id}/retry` re-queues just the URLs that errored. The successful results stay put. Use this when a flaky batch had a few bad URLs you think might succeed on a second try. Returns `400 invalid_request` if there are no failed URLs.
+
+## Next
+
+- [Events](/home/concepts/events): workspace-level SSE stream
+- [Webhooks](/home/concepts/webhooks): push notifications and signing
+- [Polling vs SSE vs webhooks](/home/guides/async-workflows/polling-vs-sse-vs-webhooks): deeper comparison

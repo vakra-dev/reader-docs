@@ -1,0 +1,110 @@
+---
+title: "Batch scraping"
+description: "Submit many URLs in one call, handle results efficiently, and stay within your limits."
+---
+
+When you have a list of URLs (from a sitemap, an RSS feed, a search result, or your own database), Reader's batch mode is the efficient way to fetch them all. You submit one request with an array, get back one job, and process the results when it finishes.
+
+## The basic request
+
+```ts
+const result = await client.read({
+  urls: [
+    "https://example.com/article/1",
+    "https://example.com/article/2",
+    "https://example.com/article/3",
+  ],
+});
+
+if (result.kind === "job") {
+  for (const page of result.data.results) {
+    if (page.error) {
+      console.warn("failed:", page.url, page.error);
+    } else {
+      console.log("ok:", page.url, page.markdown?.length);
+    }
+  }
+}
+```
+
+The SDK's `read` polls internally and returns the completed job with all results collected. Up to 1,000 URLs per request.
+
+## Why batch beats a loop
+
+A loop of sync scrapes eats your rate limit, your connection pool, and your patience:
+
+```ts
+// One request per URL: don't do this
+for (const url of urls) {
+  await client.read({ url });
+}
+```
+
+The batch version is **one** API call. Reader handles parallelism internally and returns you the whole set.
+
+## Controlling concurrency
+
+By default Reader picks a sensible parallelism level for your batch. For very large batches or target sites you want to be gentle with, set `batchConcurrency` explicitly:
+
+```ts
+await client.read({
+  urls: manyUrls,
+  batchConcurrency: 5, // Reader runs up to 5 scrapes in parallel
+});
+```
+
+Lower values are kinder to the target site (less load on their server) but take longer overall. Higher values finish faster at the cost of being more aggressive.
+
+## Handling partial failures
+
+Individual URLs in a batch can fail without killing the whole job. Each failed URL gets an `error` field; successful URLs get `markdown` and `metadata`.
+
+```ts
+const failed = result.data.results.filter((r) => r.error);
+const succeeded = result.data.results.filter((r) => !r.error);
+
+console.log(`${succeeded.length} succeeded, ${failed.length} failed`);
+
+// Retry just the failed subset if needed
+if (failed.length > 0) {
+  await client.retryJob(result.data.id);
+  // Reader re-queues the failed URLs and you get a fresh completion
+}
+```
+
+## Feeding a sitemap
+
+A common pattern: fetch a sitemap, parse it, batch-scrape the URLs:
+
+```ts
+const sitemapRes = await fetch("https://example.com/sitemap.xml");
+const sitemapXml = await sitemapRes.text();
+const urls = Array.from(sitemapXml.matchAll(/<loc>([^<]+)<\/loc>/g)).map(
+  (m) => m[1],
+);
+
+// Submit in chunks of 1,000 (the max per request)
+for (let i = 0; i < urls.length; i += 1000) {
+  const chunk = urls.slice(i, i + 1000);
+  const result = await client.read({
+    urls: chunk,
+    webhook: {
+      url: "https://your-app.example.com/hooks/reader",
+      events: ["job.completed"],
+      secret: process.env.READER_WEBHOOK_SECRET,
+    },
+  });
+  console.log(`submitted batch ${i / 1000 + 1}, job=${result.data.id}`);
+}
+```
+
+Use a webhook on batches bigger than a few dozen; polling to completion locks up your client for the duration.
+
+## Cost considerations
+
+A batch of N URLs in `auto` mode costs between N and 3N credits depending on escalation rate. See [Cost estimation](/home/guides/production/cost-estimation) for how to pilot first.
+
+## Next
+
+- [Reliable batch processing](/home/guides/async-workflows/reliable-batch): end-to-end with idempotency and retry
+- [Cost estimation](/home/guides/production/cost-estimation)

@@ -1,0 +1,116 @@
+---
+title: "Webhooks"
+description: "Push notifications when jobs finish. Signed, retried, and verifiable."
+---
+
+Webhooks are Reader's push channel for clients that aren't connected when a job finishes. Subscribe an HTTPS endpoint, pick events, and Reader POSTs you a payload the moment they happen.
+
+## Creating a webhook
+
+```bash
+curl -X POST https://api.reader.dev/v1/webhooks \
+  -H "x-api-key: $READER_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "url": "https://your-app.example.com/reader-webhook",
+    "name": "Production batch completion",
+    "events": ["job.completed", "job.failed"],
+    "secret": "your-random-secret-min-16-chars"
+  }'
+```
+
+- `url`: your HTTPS endpoint
+- `name`: a label you'll see in the dashboard
+- `events`: which events to deliver (see below)
+- `secret`: optional but **strongly recommended**. Used to sign every payload. See [verification](#verifying-signatures).
+- `headers`: optional custom headers Reader will include on every delivery (auth tokens, etc.)
+
+The response includes the webhook's `id` and echoes the `secret` back **once**. Store it now; you won't see it again.
+
+You can create up to 10 webhooks per workspace.
+
+## Supported events
+
+| Event | Fires when |
+| --- | --- |
+| `job.started` | An async job (batch or crawl) begins processing |
+| `job.page` | Each page finishes (one webhook delivery per page) |
+| `job.completed` | A job reaches `completed` state (may include failures in `results`) |
+| `job.failed` | A job reaches `failed` state (fatal, not per-URL failures) |
+| `credit.low` | Workspace balance drops below 10% of the monthly limit |
+
+Most callers subscribe to `job.completed` and `job.failed`. Subscribe to `job.page` only when you need streaming-style incremental delivery; it can be very chatty on large batches.
+
+## Headers Reader sends
+
+Every delivery includes:
+
+```
+Content-Type: application/json
+User-Agent: Reader-Webhook/1.0
+X-Reader-Event: job.completed
+X-Reader-Delivery: 7c3e89f1-2d44-4b1a-8c9f-b3d2e4f5a6b7
+X-Reader-Signature: sha256=<hex>          ← only if you provided a secret
+X-Reader-Timestamp: 1712275200            ← unix seconds, only if signed
+```
+
+Plus any custom headers you configured on the webhook.
+
+## Verifying signatures
+
+Reader signs the delivery with HMAC-SHA256 over a payload of `${timestamp}.${body}`, matching Stripe's pattern. You verify that:
+
+1. The timestamp is recent (within 5 minutes). This blocks replay attacks.
+2. The HMAC of `${timestamp}.${rawBody}` matches the signature Reader sent. This proves integrity and authenticity.
+
+```js
+import crypto from "crypto";
+
+function verify(req, secret) {
+  const signature = req.headers["x-reader-signature"];
+  const timestamp = req.headers["x-reader-timestamp"];
+  const body = req.rawBody; // MUST be raw bytes, not JSON.parse'd
+
+  // 1. Replay check
+  const age = Math.floor(Date.now() / 1000) - parseInt(timestamp);
+  if (age > 300) throw new Error("Webhook timestamp too old");
+
+  // 2. Signature check
+  const expected =
+    "sha256=" +
+    crypto.createHmac("sha256", secret).update(`${timestamp}.${body}`).digest("hex");
+
+  // 3. Constant-time compare
+  const a = Buffer.from(signature);
+  const b = Buffer.from(expected);
+  if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) {
+    throw new Error("Invalid signature");
+  }
+}
+```
+
+**Always use `rawBody`**. If you parse the JSON before hashing, the re-serialized form will almost certainly differ from the bytes Reader signed, and verification will fail. Most web frameworks expose raw body access as an option on the JSON middleware.
+
+See [Verifying webhooks](/home/guides/async-workflows/verifying-webhooks) for Express, FastAPI, and Next.js patterns.
+
+## Delivery and retries
+
+- **Timeout:** Reader waits up to 10 seconds for your endpoint to respond.
+- **Success:** any 2xx status.
+- **Retries:** on non-2xx or timeout, Reader retries with exponential backoff (1s, 4s, 16s), then gives up after 3 total attempts.
+- **Dead letters:** failed deliveries show up in the webhook's `deliveryStats` and are visible in the dashboard.
+
+Make your endpoint **idempotent**. Reader may deliver the same event twice if your endpoint is slow to respond and Reader retries after a delivery that actually succeeded. Key off `X-Reader-Delivery` to dedupe.
+
+## Disabling and updating
+
+- `PATCH /v1/webhooks/{id}`: update URL, events, or toggle `active: false`
+- `DELETE /v1/webhooks/{id}`: remove it entirely
+
+Disabled webhooks stop receiving deliveries immediately; you can re-enable them later without losing the secret.
+
+## Next
+
+- [Verifying webhooks](/home/guides/async-workflows/verifying-webhooks): code for common frameworks
+- [Webhook workflows](/home/guides/async-workflows/webhook-workflows): end-to-end patterns
+- [Webhook retries](/home/guides/async-workflows/webhook-retries): handling delivery failures on your side

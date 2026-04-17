@@ -1,0 +1,2482 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Reader API",
+    "version": "1.0.0",
+    "description": "Reader turns any URL into clean markdown for LLMs. One endpoint (`POST /v1/read`) handles scrape, batch, and crawl operations. See https://reader.dev/docs for concepts and guides."
+  },
+  "servers": [
+    {
+      "url": "https://api.reader.dev",
+      "description": "Production"
+    }
+  ],
+  "tags": [
+    {
+      "name": "Read",
+      "description": "Scrape, batch, and crawl operations"
+    },
+    {
+      "name": "Jobs",
+      "description": "Async job management"
+    },
+    {
+      "name": "Webhooks",
+      "description": "Event subscriptions"
+    },
+    {
+      "name": "Account",
+      "description": "API keys, credits, and usage"
+    }
+  ],
+  "components": {
+    "securitySchemes": {
+      "ApiKeyAuth": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "x-api-key"
+      }
+    },
+    "schemas": {
+      "ErrorEnvelope": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [
+              false
+            ]
+          },
+          "error": {
+            "type": "object",
+            "properties": {
+              "code": {
+                "$ref": "#/components/schemas/ErrorCode"
+              },
+              "message": {
+                "type": "string"
+              },
+              "details": {
+                "type": "object",
+                "additionalProperties": {}
+              },
+              "docsUrl": {
+                "type": "string",
+                "format": "uri"
+              }
+            },
+            "required": [
+              "code",
+              "message",
+              "docsUrl"
+            ]
+          }
+        },
+        "required": [
+          "success",
+          "error"
+        ]
+      },
+      "ErrorCode": {
+        "type": "string",
+        "enum": [
+          "invalid_request",
+          "unauthenticated",
+          "insufficient_credits",
+          "url_blocked",
+          "not_found",
+          "conflict",
+          "rate_limited",
+          "concurrency_limited",
+          "internal_error",
+          "upstream_unavailable",
+          "scrape_timeout"
+        ]
+      },
+      "ScrapeResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          },
+          "data": {
+            "$ref": "#/components/schemas/ScrapeResult"
+          }
+        },
+        "required": [
+          "success",
+          "data"
+        ],
+        "example": {
+          "success": true,
+          "data": {
+            "url": "https://example.com",
+            "markdown": "# Example Domain\n\nThis domain is for use in illustrative examples in documents. You may use this domain in literature without prior coordination or asking for permission.\n\n[More information...](https://www.iana.org/domains/example)",
+            "metadata": {
+              "title": "Example Domain",
+              "description": null,
+              "statusCode": 200,
+              "duration": 487,
+              "cached": false,
+              "proxyMode": "standard",
+              "proxyEscalated": false,
+              "scrapedAt": "2026-04-04T12:00:00Z"
+            }
+          }
+        }
+      },
+      "ScrapeResult": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string",
+            "format": "uri"
+          },
+          "markdown": {
+            "type": "string"
+          },
+          "html": {
+            "type": "string"
+          },
+          "metadata": {
+            "$ref": "#/components/schemas/ScrapeMetadata"
+          }
+        },
+        "required": [
+          "url",
+          "metadata"
+        ]
+      },
+      "ScrapeMetadata": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "description": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "statusCode": {
+            "type": "integer"
+          },
+          "duration": {
+            "type": "integer",
+            "description": "Scrape duration in ms."
+          },
+          "cached": {
+            "type": "boolean"
+          },
+          "proxyMode": {
+            "$ref": "#/components/schemas/ResolvedProxyMode"
+          },
+          "proxyEscalated": {
+            "type": "boolean",
+            "description": "True if `auto` escalated from standard to stealth."
+          },
+          "scrapedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "duration",
+          "cached",
+          "scrapedAt"
+        ]
+      },
+      "ResolvedProxyMode": {
+        "type": "string",
+        "enum": [
+          "standard",
+          "stealth"
+        ],
+        "description": "The proxy mode that actually ran. Always resolves to `standard` or `stealth`, never `auto`."
+      },
+      "JobCreatedResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          },
+          "data": {
+            "$ref": "#/components/schemas/JobSummary"
+          }
+        },
+        "required": [
+          "success",
+          "data"
+        ],
+        "example": {
+          "success": true,
+          "data": {
+            "id": "job_9fba2",
+            "status": "queued",
+            "mode": "batch",
+            "total": 3,
+            "completed": 0,
+            "creditsUsed": 0,
+            "createdAt": "2026-04-04T12:00:00Z"
+          }
+        }
+      },
+      "JobSummary": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "queued",
+              "processing",
+              "completed",
+              "failed",
+              "cancelled"
+            ]
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "scrape",
+              "batch",
+              "crawl"
+            ]
+          },
+          "total": {
+            "type": "integer"
+          },
+          "completed": {
+            "type": "integer"
+          },
+          "creditsUsed": {
+            "type": "integer"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "status",
+          "mode",
+          "total",
+          "completed",
+          "creditsUsed",
+          "createdAt"
+        ]
+      },
+      "ReadRequest": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string",
+            "format": "uri",
+            "example": "https://example.com"
+          },
+          "urls": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uri"
+            },
+            "minItems": 1,
+            "maxItems": 1000
+          },
+          "formats": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "markdown",
+                "html"
+              ]
+            },
+            "description": "Content formats to include in the response.",
+            "example": [
+              "markdown"
+            ]
+          },
+          "onlyMainContent": {
+            "type": "boolean",
+            "description": "Strip navigation, footers, and boilerplate. Default: true."
+          },
+          "includeTags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "excludeTags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "waitForSelector": {
+            "type": "string"
+          },
+          "timeoutMs": {
+            "type": "integer",
+            "minimum": 1000,
+            "maximum": 120000
+          },
+          "proxyMode": {
+            "$ref": "#/components/schemas/ProxyMode"
+          },
+          "batchConcurrency": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 20
+          },
+          "maxDepth": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 10,
+            "description": "Crawl depth (when crawling). Omit for single-URL scrape."
+          },
+          "maxPages": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 10000,
+            "description": "Maximum pages to discover during crawl."
+          },
+          "cache": {
+            "type": "boolean",
+            "description": "Reuse cached content within TTL. Default: true."
+          },
+          "webhook": {
+            "type": "object",
+            "properties": {
+              "url": {
+                "type": "string",
+                "format": "uri"
+              },
+              "events": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "secret": {
+                "type": "string",
+                "minLength": 16,
+                "maxLength": 256
+              }
+            },
+            "required": [
+              "url"
+            ]
+          }
+        }
+      },
+      "ProxyMode": {
+        "type": "string",
+        "enum": [
+          "standard",
+          "stealth",
+          "auto"
+        ],
+        "description": "Proxy mode for the scrape. `standard` is fast and affordable; `stealth` bypasses aggressive bot walls; `auto` picks automatically and only escalates to stealth when a block is detected. Default: `auto`.",
+        "example": "auto"
+      },
+      "JobResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          },
+          "data": {
+            "$ref": "#/components/schemas/JobDetail"
+          },
+          "pagination": {
+            "$ref": "#/components/schemas/Pagination"
+          }
+        },
+        "required": [
+          "success",
+          "data",
+          "pagination"
+        ]
+      },
+      "JobDetail": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "queued",
+              "processing",
+              "completed",
+              "failed",
+              "cancelled"
+            ]
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "scrape",
+              "batch",
+              "crawl"
+            ]
+          },
+          "completed": {
+            "type": "integer"
+          },
+          "total": {
+            "type": "integer"
+          },
+          "creditsUsed": {
+            "type": "integer"
+          },
+          "error": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "results": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/JobResultEntry"
+            }
+          },
+          "startedAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "completedAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "status",
+          "mode",
+          "completed",
+          "total",
+          "creditsUsed",
+          "error",
+          "results",
+          "startedAt",
+          "completedAt",
+          "createdAt"
+        ]
+      },
+      "JobResultEntry": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string",
+            "format": "uri"
+          },
+          "markdown": {
+            "type": "string"
+          },
+          "html": {
+            "type": "string"
+          },
+          "statusCode": {
+            "type": "integer"
+          },
+          "proxyMode": {
+            "$ref": "#/components/schemas/ResolvedProxyMode"
+          },
+          "proxyEscalated": {
+            "type": "boolean"
+          },
+          "credits": {
+            "type": "integer"
+          },
+          "metadata": {
+            "type": "object",
+            "additionalProperties": {}
+          },
+          "error": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "url"
+        ]
+      },
+      "Pagination": {
+        "type": "object",
+        "properties": {
+          "total": {
+            "type": "integer",
+            "example": 1234
+          },
+          "skip": {
+            "type": "integer",
+            "example": 0
+          },
+          "limit": {
+            "type": "integer",
+            "example": 20
+          },
+          "hasMore": {
+            "type": "boolean",
+            "example": true
+          },
+          "next": {
+            "type": "string",
+            "format": "uri",
+            "example": "https://api.reader.dev/v1/jobs/abc?skip=20&limit=20"
+          }
+        },
+        "required": [
+          "total",
+          "skip",
+          "limit",
+          "hasMore"
+        ]
+      },
+      "SseStream": {
+        "type": "string",
+        "description": "Server-Sent Events stream. Each frame is a line-delimited event with an `event:` line, a `data:` line (JSON payload), and a trailing blank line. Keep-alive comments (`: ping`) are sent every 30 seconds. See [Events](/home/concepts/events) for the full event catalog.",
+        "example": "event: job:progress\ndata: {\"jobId\":\"j_abc\",\"status\":\"processing\",\"completed\":45,\"total\":100}\n\nevent: job:completed\ndata: {\"jobId\":\"j_abc\",\"status\":\"completed\",\"completed\":100,\"total\":100,\"creditsUsed\":100}\n\n"
+      },
+      "Webhook": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string",
+            "format": "uri"
+          },
+          "name": {
+            "type": "string"
+          },
+          "events": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "secret": {
+            "type": "string",
+            "description": "HMAC secret. Visible only on the create response."
+          },
+          "headers": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            }
+          },
+          "active": {
+            "type": "boolean"
+          },
+          "deliveryStats": {
+            "type": "object",
+            "properties": {
+              "totalAttempts": {
+                "type": "integer"
+              },
+              "failedDeliveries": {
+                "type": "integer"
+              },
+              "lastDeliveryAt": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "format": "date-time"
+              },
+              "lastDeliveryStatus": {
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "totalAttempts",
+              "failedDeliveries",
+              "lastDeliveryAt",
+              "lastDeliveryStatus"
+            ]
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "url",
+          "name",
+          "events",
+          "headers",
+          "active",
+          "deliveryStats",
+          "createdAt",
+          "updatedAt"
+        ]
+      },
+      "CreateWebhookRequest": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string",
+            "format": "uri"
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "events": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "minItems": 1
+          },
+          "secret": {
+            "type": "string",
+            "minLength": 16,
+            "maxLength": 256
+          },
+          "headers": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "url",
+          "name",
+          "events"
+        ]
+      },
+      "Credits": {
+        "type": "object",
+        "properties": {
+          "balance": {
+            "type": "integer"
+          },
+          "limit": {
+            "type": "integer"
+          },
+          "used": {
+            "type": "integer"
+          },
+          "tier": {
+            "type": "string",
+            "enum": [
+              "free",
+              "pro",
+              "business",
+              "enterprise"
+            ]
+          },
+          "resetAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "balance",
+          "limit",
+          "used",
+          "tier",
+          "resetAt"
+        ]
+      },
+      "UsageEntry": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string",
+            "format": "uri"
+          },
+          "duration": {
+            "type": "integer"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "success",
+              "error"
+            ]
+          },
+          "cached": {
+            "type": "boolean"
+          },
+          "proxyMode": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ResolvedProxyMode"
+              },
+              {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            ]
+          },
+          "credits": {
+            "type": "integer"
+          },
+          "error": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "url",
+          "duration",
+          "status",
+          "cached",
+          "proxyMode",
+          "credits",
+          "error",
+          "createdAt"
+        ]
+      },
+      "ApiKeySummary": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "last4": {
+            "type": "string"
+          },
+          "active": {
+            "type": "boolean"
+          },
+          "rateLimit": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "expiresAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "lastUsedAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "last4",
+          "active",
+          "rateLimit",
+          "expiresAt",
+          "lastUsedAt",
+          "createdAt"
+        ]
+      }
+    },
+    "parameters": {}
+  },
+  "paths": {
+    "/v1/read": {
+      "post": {
+        "summary": "Scrape, batch, or crawl",
+        "description": "Unified endpoint for all read operations. Pass `url` for a single scrape, `urls` for a batch, or `url` + `maxPages` to crawl a site.",
+        "tags": [
+          "Read"
+        ],
+        "security": [
+          {
+            "ApiKeyAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReadRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Sync scrape completed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScrapeResponse"
+                },
+                "example": {
+                  "success": true,
+                  "data": {
+                    "url": "https://example.com",
+                    "markdown": "# Example Domain\n\nThis domain is for use in illustrative examples in documents. You may use this domain in literature without prior coordination or asking for permission.\n\n[More information...](https://www.iana.org/domains/example)",
+                    "metadata": {
+                      "title": "Example Domain",
+                      "description": null,
+                      "statusCode": 200,
+                      "duration": 487,
+                      "cached": false,
+                      "proxyMode": "standard",
+                      "proxyEscalated": false,
+                      "scrapedAt": "2026-04-04T12:00:00Z"
+                    }
+                  }
+                },
+                "examples": {
+                  "scrape": {
+                    "summary": "Single-URL scrape",
+                    "value": {
+                      "success": true,
+                      "data": {
+                        "url": "https://example.com",
+                        "markdown": "# Example Domain\n\nThis domain is for use in illustrative examples in documents. You may use this domain in literature without prior coordination or asking for permission.\n\n[More information...](https://www.iana.org/domains/example)",
+                        "metadata": {
+                          "title": "Example Domain",
+                          "description": null,
+                          "statusCode": 200,
+                          "duration": 487,
+                          "cached": false,
+                          "proxyMode": "standard",
+                          "proxyEscalated": false,
+                          "scrapedAt": "2026-04-04T12:00:00Z"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "Async job created (batch or crawl)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobCreatedResponse"
+                },
+                "example": {
+                  "success": true,
+                  "data": {
+                    "id": "job_9fba2",
+                    "status": "queued",
+                    "mode": "batch",
+                    "total": 3,
+                    "completed": 0,
+                    "creditsUsed": 0,
+                    "createdAt": "2026-04-04T12:00:00Z"
+                  }
+                },
+                "examples": {
+                  "jobCreated": {
+                    "summary": "Batch or crawl job accepted",
+                    "value": {
+                      "success": true,
+                      "data": {
+                        "id": "job_9fba2",
+                        "status": "queued",
+                        "mode": "batch",
+                        "total": 3,
+                        "completed": 0,
+                        "creditsUsed": 0,
+                        "createdAt": "2026-04-04T12:00:00Z"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "example": {
+                  "success": false,
+                  "error": {
+                    "code": "invalid_request",
+                    "message": "Invalid request body",
+                    "details": {
+                      "issues": [
+                        {
+                          "path": "url",
+                          "code": "invalid_string",
+                          "message": "Invalid url"
+                        }
+                      ]
+                    },
+                    "docsUrl": "https://reader.dev/docs/home/concepts/errors#invalid-request"
+                  }
+                },
+                "examples": {
+                  "invalid_request": {
+                    "summary": "Invalid request",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "invalid_request",
+                        "message": "Invalid request body",
+                        "details": {
+                          "issues": [
+                            {
+                              "path": "url",
+                              "code": "invalid_string",
+                              "message": "Invalid url"
+                            }
+                          ]
+                        },
+                        "docsUrl": "https://reader.dev/docs/home/concepts/errors#invalid-request"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "example": {
+                  "success": false,
+                  "error": {
+                    "code": "unauthenticated",
+                    "message": "Missing or invalid API key",
+                    "docsUrl": "https://reader.dev/docs/home/concepts/errors#unauthenticated"
+                  }
+                },
+                "examples": {
+                  "unauthenticated": {
+                    "summary": "Unauthenticated",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "unauthenticated",
+                        "message": "Missing or invalid API key",
+                        "docsUrl": "https://reader.dev/docs/home/concepts/errors#unauthenticated"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "402": {
+            "description": "Insufficient credits",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "example": {
+                  "success": false,
+                  "error": {
+                    "code": "insufficient_credits",
+                    "message": "You need 50 credits but only 10 are available. Upgrade your plan or wait for the next billing cycle.",
+                    "details": {
+                      "required": 50,
+                      "available": 10,
+                      "resetAt": "2026-05-01T00:00:00Z"
+                    },
+                    "docsUrl": "https://reader.dev/docs/home/concepts/errors#insufficient-credits"
+                  }
+                },
+                "examples": {
+                  "insufficient_credits": {
+                    "summary": "Insufficient credits",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "insufficient_credits",
+                        "message": "You need 50 credits but only 10 are available. Upgrade your plan or wait for the next billing cycle.",
+                        "details": {
+                          "required": 50,
+                          "available": 10,
+                          "resetAt": "2026-05-01T00:00:00Z"
+                        },
+                        "docsUrl": "https://reader.dev/docs/home/concepts/errors#insufficient-credits"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "URL blocked",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "example": {
+                  "success": false,
+                  "error": {
+                    "code": "url_blocked",
+                    "message": "URL blocked: Resolves to private IP",
+                    "details": {
+                      "url": "https://10.0.0.1",
+                      "reason": "Resolves to private IP"
+                    },
+                    "docsUrl": "https://reader.dev/docs/home/concepts/errors#url-blocked"
+                  }
+                },
+                "examples": {
+                  "url_blocked": {
+                    "summary": "URL blocked",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "url_blocked",
+                        "message": "URL blocked: Resolves to private IP",
+                        "details": {
+                          "url": "https://10.0.0.1",
+                          "reason": "Resolves to private IP"
+                        },
+                        "docsUrl": "https://reader.dev/docs/home/concepts/errors#url-blocked"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "example": {
+                  "success": false,
+                  "error": {
+                    "code": "rate_limited",
+                    "message": "Rate limit of 60 requests per 60s exceeded. Retry after 12s.",
+                    "details": {
+                      "limit": 60,
+                      "windowSeconds": 60,
+                      "retryAfterSeconds": 12
+                    },
+                    "docsUrl": "https://reader.dev/docs/home/concepts/errors#rate-limited"
+                  }
+                },
+                "examples": {
+                  "rate_limited": {
+                    "summary": "Rate limited",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "rate_limited",
+                        "message": "Rate limit of 60 requests per 60s exceeded. Retry after 12s.",
+                        "details": {
+                          "limit": 60,
+                          "windowSeconds": 60,
+                          "retryAfterSeconds": 12
+                        },
+                        "docsUrl": "https://reader.dev/docs/home/concepts/errors#rate-limited"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Upstream unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "example": {
+                  "success": false,
+                  "error": {
+                    "code": "upstream_unavailable",
+                    "message": "Upstream service is unavailable",
+                    "docsUrl": "https://reader.dev/docs/home/concepts/errors#upstream-unavailable"
+                  }
+                },
+                "examples": {
+                  "upstream_unavailable": {
+                    "summary": "Upstream unavailable",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "upstream_unavailable",
+                        "message": "Upstream service is unavailable",
+                        "docsUrl": "https://reader.dev/docs/home/concepts/errors#upstream-unavailable"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Scrape timed out",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "example": {
+                  "success": false,
+                  "error": {
+                    "code": "scrape_timeout",
+                    "message": "Scrape exceeded 30000ms timeout",
+                    "details": {
+                      "timeoutMs": 30000
+                    },
+                    "docsUrl": "https://reader.dev/docs/home/concepts/errors#scrape-timeout"
+                  }
+                },
+                "examples": {
+                  "scrape_timeout": {
+                    "summary": "Scrape timed out",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "scrape_timeout",
+                        "message": "Scrape exceeded 30000ms timeout",
+                        "details": {
+                          "timeoutMs": 30000
+                        },
+                        "docsUrl": "https://reader.dev/docs/home/concepts/errors#scrape-timeout"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/jobs/{id}": {
+      "get": {
+        "summary": "Get job status and results",
+        "tags": [
+          "Jobs"
+        ],
+        "security": [
+          {
+            "ApiKeyAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "required": false,
+            "name": "skip",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100
+            },
+            "required": false,
+            "name": "limit",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Job details with paginated results",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "example": {
+                  "success": false,
+                  "error": {
+                    "code": "unauthenticated",
+                    "message": "Missing or invalid API key",
+                    "docsUrl": "https://reader.dev/docs/home/concepts/errors#unauthenticated"
+                  }
+                },
+                "examples": {
+                  "unauthenticated": {
+                    "summary": "Unauthenticated",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "unauthenticated",
+                        "message": "Missing or invalid API key",
+                        "docsUrl": "https://reader.dev/docs/home/concepts/errors#unauthenticated"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Job not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "example": {
+                  "success": false,
+                  "error": {
+                    "code": "not_found",
+                    "message": "Job not found",
+                    "docsUrl": "https://reader.dev/docs/home/concepts/errors#not-found"
+                  }
+                },
+                "examples": {
+                  "not_found": {
+                    "summary": "Job not found",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "not_found",
+                        "message": "Job not found",
+                        "docsUrl": "https://reader.dev/docs/home/concepts/errors#not-found"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "summary": "Cancel a job",
+        "tags": [
+          "Jobs"
+        ],
+        "security": [
+          {
+            "ApiKeyAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Job cancelled",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "status": {
+                          "type": "string",
+                          "enum": [
+                            "cancelled"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "status"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Job not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "example": {
+                  "success": false,
+                  "error": {
+                    "code": "not_found",
+                    "message": "Job not found",
+                    "docsUrl": "https://reader.dev/docs/home/concepts/errors#not-found"
+                  }
+                },
+                "examples": {
+                  "not_found": {
+                    "summary": "Job not found",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "not_found",
+                        "message": "Job not found",
+                        "docsUrl": "https://reader.dev/docs/home/concepts/errors#not-found"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Job already terminal",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "example": {
+                  "success": false,
+                  "error": {
+                    "code": "conflict",
+                    "message": "Job is already completed",
+                    "details": {
+                      "status": "completed"
+                    },
+                    "docsUrl": "https://reader.dev/docs/home/concepts/errors#conflict"
+                  }
+                },
+                "examples": {
+                  "conflict": {
+                    "summary": "Job already terminal",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "conflict",
+                        "message": "Job is already completed",
+                        "details": {
+                          "status": "completed"
+                        },
+                        "docsUrl": "https://reader.dev/docs/home/concepts/errors#conflict"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/events": {
+      "get": {
+        "summary": "Workspace events stream (SSE)",
+        "description": "Long-lived Server-Sent Events connection that emits real-time progress, completion, and failure events for every job in the workspace. Use this for dashboards and realtime UIs. For a single job, use `GET /v1/jobs/{id}/stream` instead.",
+        "tags": [
+          "Jobs"
+        ],
+        "security": [
+          {
+            "ApiKeyAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "SSE stream that stays open until the client disconnects",
+            "content": {
+              "text/event-stream": {
+                "schema": {
+                  "$ref": "#/components/schemas/SseStream"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "example": {
+                  "success": false,
+                  "error": {
+                    "code": "unauthenticated",
+                    "message": "Missing or invalid API key",
+                    "docsUrl": "https://reader.dev/docs/home/concepts/errors#unauthenticated"
+                  }
+                },
+                "examples": {
+                  "unauthenticated": {
+                    "summary": "Unauthenticated",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "unauthenticated",
+                        "message": "Missing or invalid API key",
+                        "docsUrl": "https://reader.dev/docs/home/concepts/errors#unauthenticated"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/jobs/{id}/stream": {
+      "get": {
+        "summary": "Per-job events stream (SSE)",
+        "description": "Server-Sent Events stream scoped to a single job. Emits `progress`, `page`, `error`, and `done` events as the job makes progress. Stream closes automatically when the job reaches a terminal state.",
+        "tags": [
+          "Jobs"
+        ],
+        "security": [
+          {
+            "ApiKeyAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "SSE stream that closes when the job terminates",
+            "content": {
+              "text/event-stream": {
+                "schema": {
+                  "$ref": "#/components/schemas/SseStream"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "example": {
+                  "success": false,
+                  "error": {
+                    "code": "unauthenticated",
+                    "message": "Missing or invalid API key",
+                    "docsUrl": "https://reader.dev/docs/home/concepts/errors#unauthenticated"
+                  }
+                },
+                "examples": {
+                  "unauthenticated": {
+                    "summary": "Unauthenticated",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "unauthenticated",
+                        "message": "Missing or invalid API key",
+                        "docsUrl": "https://reader.dev/docs/home/concepts/errors#unauthenticated"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Job not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "example": {
+                  "success": false,
+                  "error": {
+                    "code": "not_found",
+                    "message": "Job not found",
+                    "docsUrl": "https://reader.dev/docs/home/concepts/errors#not-found"
+                  }
+                },
+                "examples": {
+                  "not_found": {
+                    "summary": "Job not found",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "not_found",
+                        "message": "Job not found",
+                        "docsUrl": "https://reader.dev/docs/home/concepts/errors#not-found"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/jobs/{id}/retry": {
+      "post": {
+        "summary": "Retry failed URLs in a job",
+        "tags": [
+          "Jobs"
+        ],
+        "security": [
+          {
+            "ApiKeyAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Retry scheduled",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "status": {
+                          "type": "string"
+                        },
+                        "retrying": {
+                          "type": "integer"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "status",
+                        "retrying"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "No failed URLs to retry",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "example": {
+                  "success": false,
+                  "error": {
+                    "code": "invalid_request",
+                    "message": "Job has no failed URLs to retry",
+                    "docsUrl": "https://reader.dev/docs/home/concepts/errors#invalid-request"
+                  }
+                },
+                "examples": {
+                  "invalid_request": {
+                    "summary": "No failed URLs to retry",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "invalid_request",
+                        "message": "Job has no failed URLs to retry",
+                        "docsUrl": "https://reader.dev/docs/home/concepts/errors#invalid-request"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Job not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "example": {
+                  "success": false,
+                  "error": {
+                    "code": "not_found",
+                    "message": "Job not found",
+                    "docsUrl": "https://reader.dev/docs/home/concepts/errors#not-found"
+                  }
+                },
+                "examples": {
+                  "not_found": {
+                    "summary": "Job not found",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "not_found",
+                        "message": "Job not found",
+                        "docsUrl": "https://reader.dev/docs/home/concepts/errors#not-found"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/webhooks": {
+      "post": {
+        "summary": "Create a webhook subscription",
+        "tags": [
+          "Webhooks"
+        ],
+        "security": [
+          {
+            "ApiKeyAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateWebhookRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Webhook created (secret visible once)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/Webhook"
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "example": {
+                  "success": false,
+                  "error": {
+                    "code": "invalid_request",
+                    "message": "Invalid request body",
+                    "details": {
+                      "issues": [
+                        {
+                          "path": "url",
+                          "code": "invalid_string",
+                          "message": "Invalid url"
+                        }
+                      ]
+                    },
+                    "docsUrl": "https://reader.dev/docs/home/concepts/errors#invalid-request"
+                  }
+                },
+                "examples": {
+                  "invalid_request": {
+                    "summary": "Invalid request",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "invalid_request",
+                        "message": "Invalid request body",
+                        "details": {
+                          "issues": [
+                            {
+                              "path": "url",
+                              "code": "invalid_string",
+                              "message": "Invalid url"
+                            }
+                          ]
+                        },
+                        "docsUrl": "https://reader.dev/docs/home/concepts/errors#invalid-request"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Webhook limit reached",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "example": {
+                  "success": false,
+                  "error": {
+                    "code": "conflict",
+                    "message": "Maximum of 10 webhooks per workspace",
+                    "details": {
+                      "limit": 10
+                    },
+                    "docsUrl": "https://reader.dev/docs/home/concepts/errors#conflict"
+                  }
+                },
+                "examples": {
+                  "conflict": {
+                    "summary": "Webhook limit reached",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "conflict",
+                        "message": "Maximum of 10 webhooks per workspace",
+                        "details": {
+                          "limit": 10
+                        },
+                        "docsUrl": "https://reader.dev/docs/home/concepts/errors#conflict"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "summary": "List webhooks",
+        "tags": [
+          "Webhooks"
+        ],
+        "security": [
+          {
+            "ApiKeyAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "required": false,
+            "name": "skip",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100
+            },
+            "required": false,
+            "name": "limit",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Paginated list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Webhook"
+                      }
+                    },
+                    "pagination": {
+                      "$ref": "#/components/schemas/Pagination"
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data",
+                    "pagination"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/webhooks/{id}": {
+      "patch": {
+        "summary": "Update a webhook",
+        "tags": [
+          "Webhooks"
+        ],
+        "security": [
+          {
+            "ApiKeyAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "url": {
+                    "type": "string",
+                    "format": "uri"
+                  },
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 100
+                  },
+                  "events": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    },
+                    "minItems": 1
+                  },
+                  "secret": {
+                    "type": "string",
+                    "minLength": 16,
+                    "maxLength": 256
+                  },
+                  "headers": {
+                    "type": "object",
+                    "additionalProperties": {
+                      "type": "string"
+                    }
+                  },
+                  "active": {
+                    "type": "boolean"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated webhook",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/Webhook"
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Webhook not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "example": {
+                  "success": false,
+                  "error": {
+                    "code": "not_found",
+                    "message": "Webhook not found",
+                    "docsUrl": "https://reader.dev/docs/home/concepts/errors#not-found"
+                  }
+                },
+                "examples": {
+                  "not_found": {
+                    "summary": "Webhook not found",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "not_found",
+                        "message": "Webhook not found",
+                        "docsUrl": "https://reader.dev/docs/home/concepts/errors#not-found"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "summary": "Delete a webhook",
+        "tags": [
+          "Webhooks"
+        ],
+        "security": [
+          {
+            "ApiKeyAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Deleted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "id"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Webhook not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "example": {
+                  "success": false,
+                  "error": {
+                    "code": "not_found",
+                    "message": "Webhook not found",
+                    "docsUrl": "https://reader.dev/docs/home/concepts/errors#not-found"
+                  }
+                },
+                "examples": {
+                  "not_found": {
+                    "summary": "Webhook not found",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "not_found",
+                        "message": "Webhook not found",
+                        "docsUrl": "https://reader.dev/docs/home/concepts/errors#not-found"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/usage/credits": {
+      "get": {
+        "summary": "Get credit balance",
+        "tags": [
+          "Account"
+        ],
+        "security": [
+          {
+            "ApiKeyAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Credit balance",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/Credits"
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/usage/history": {
+      "get": {
+        "summary": "List usage history",
+        "tags": [
+          "Account"
+        ],
+        "security": [
+          {
+            "ApiKeyAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "required": false,
+            "name": "skip",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100
+            },
+            "required": false,
+            "name": "limit",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Paginated usage history",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/UsageEntry"
+                      }
+                    },
+                    "pagination": {
+                      "$ref": "#/components/schemas/Pagination"
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data",
+                    "pagination"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/api-keys": {
+      "get": {
+        "summary": "List API keys",
+        "tags": [
+          "Account"
+        ],
+        "security": [
+          {
+            "ApiKeyAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "API keys",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/ApiKeySummary"
+                      }
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Create an API key",
+        "tags": [
+          "Account"
+        ],
+        "security": [
+          {
+            "ApiKeyAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "API key created (raw key visible once)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "name": {
+                          "type": "string"
+                        },
+                        "key": {
+                          "type": "string"
+                        },
+                        "last4": {
+                          "type": "string"
+                        },
+                        "createdAt": {
+                          "type": "string",
+                          "format": "date-time"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "name",
+                        "key",
+                        "last4",
+                        "createdAt"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/api-keys/{id}": {
+      "delete": {
+        "summary": "Revoke an API key",
+        "tags": [
+          "Account"
+        ],
+        "security": [
+          {
+            "ApiKeyAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Revoked",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "id"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "API key not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "example": {
+                  "success": false,
+                  "error": {
+                    "code": "not_found",
+                    "message": "API key not found",
+                    "docsUrl": "https://reader.dev/docs/home/concepts/errors#not-found"
+                  }
+                },
+                "examples": {
+                  "not_found": {
+                    "summary": "API key not found",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "not_found",
+                        "message": "API key not found",
+                        "docsUrl": "https://reader.dev/docs/home/concepts/errors#not-found"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "webhooks": {}
+}

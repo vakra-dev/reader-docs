@@ -1,0 +1,101 @@
+---
+title: "Scrape vs crawl"
+description: "Scrape fetches URLs you already know. Crawl discovers URLs by following links. Both return the same page shape."
+---
+
+Reader distinguishes two operations by what you know going in:
+
+- **Scrape**: you already have the URLs. Reader fetches them and returns content.
+- **Crawl**: you have one starting URL and want Reader to discover and fetch the rest by following links.
+
+You trigger each from the same endpoint (`POST /v1/read`) by changing the body. The page-level output shape is identical.
+
+## Scrape
+
+Pass `url` for a single page, `urls` for a list. A single URL runs synchronously and returns the result in the response body. A list creates an async job.
+
+```bash
+# Single URL: sync, returns immediately
+curl -X POST https://api.reader.dev/v1/read \
+  -H "x-api-key: $READER_KEY" \
+  -d '{ "url": "https://example.com/blog/post-1" }'
+
+# Many URLs: async, returns a job
+curl -X POST https://api.reader.dev/v1/read \
+  -H "x-api-key: $READER_KEY" \
+  -d '{
+    "urls": [
+      "https://example.com/blog/post-1",
+      "https://example.com/blog/post-2",
+      "https://example.com/blog/post-3"
+    ]
+  }'
+```
+
+Use scrape when:
+
+- You have a sitemap, RSS feed, CSV, or search-result list of URLs
+- You're re-fetching pages that changed
+- You're ingesting a known set of product or article URLs for an LLM pipeline
+
+## Crawl
+
+Pass `url` together with `maxDepth` or `maxPages`. Reader starts at the URL, extracts links from each page, and follows them up to the limits you set.
+
+```bash
+curl -X POST https://api.reader.dev/v1/read \
+  -H "x-api-key: $READER_KEY" \
+  -d '{
+    "url": "https://docs.example.com",
+    "maxDepth": 3,
+    "maxPages": 200
+  }'
+```
+
+Crawl returns an async job. Results come in as pages are discovered and fetched. You can poll, stream via SSE, or get a webhook on completion.
+
+Use crawl when:
+
+- You want to index an entire docs site, knowledge base, or blog
+- You don't have a list of URLs and don't want to build one
+- You need Reader to discover pages you haven't seen yet
+
+### Limits
+
+| Knob | Default | Max |
+| --- | --- | --- |
+| `maxDepth` | 2 | 10 |
+| `maxPages` | 20 | 10000 |
+
+Crawls stay strictly on the same hostname as the seed URL. Links to subdomains or other hosts are ignored (e.g., crawling `docs.stripe.com` will not follow links to `dashboard.stripe.com`).
+
+## When to batch-scrape instead of crawl
+
+If you can generate the URL list yourself (from a sitemap, RSS feed, or your own database), prefer batch scrape over crawl. You pay only for pages you actually want, you control the order, and you don't spend budget on pages the crawler happens to find but you don't care about.
+
+A rule of thumb:
+
+- **Got URLs?** Batch scrape.
+- **Don't have URLs and the site doesn't publish a sitemap?** Crawl.
+- **The site has a sitemap.xml?** Fetch the sitemap, batch-scrape the URLs you want.
+
+## Same output shape
+
+A crawl result and a batch result are the same thing as far as your code is concerned: a job with a `results` array where each entry is one page. You can write one handler and point it at either.
+
+```ts
+const result = await client.read({ urls: [...] });        // batch
+// or
+const result = await client.read({ url, maxPages: 100 }); // crawl
+
+if (result.kind === "job") {
+  for (const page of result.data.results) {
+    savePage(page.url, page.markdown);
+  }
+}
+```
+
+## Next
+
+- [Async jobs](/home/concepts/async-jobs): how to watch a batch or crawl finish
+- [Choosing a proxy mode](/home/guides/advanced/choosing-a-proxy-mode): when to force stealth

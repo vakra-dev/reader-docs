@@ -1,0 +1,41 @@
+---
+title: "Main content extraction"
+description: "How Reader strips boilerplate and when to turn it off."
+---
+
+By default Reader strips navigation, footers, sidebars, cookie banners, newsletter pop-ups, and other boilerplate, keeping just the article body. This is the `onlyMainContent: true` default.
+
+For most use cases (LLM pipelines, RAG indexing, clean markdown output for humans) this is what you want. Boilerplate is noise and tokens.
+
+## Leave it on (the default)
+
+```ts
+await client.read({ url: "https://example.com/blog/post" });
+// Returns the article only, no "Sign up for our newsletter" CTA in your LLM context
+```
+
+## Turn it off
+
+```ts
+await client.read({
+  url: "https://example.com/blog/post",
+  onlyMainContent: false,
+});
+```
+
+When to:
+
+- **You want the nav bar's links.** For example, you're scraping a docs homepage specifically to find every sub-page link, so you need the full navigation.
+- **There is no "article" on the page.** Landing pages, pricing pages, homepages: these are all content, so there's nothing to strip.
+- **You're debugging.** "Reader dropped the section I wanted". Turn main-content off to confirm what the page actually contains, then turn it back on with `excludeTags` to remove what you don't want.
+
+## How it works
+
+Reader uses heuristics similar to Mozilla's Readability algorithm: scoring DOM nodes by the density of text, the presence of typical article markers (`<article>`, `<main>`, schema.org markers), and penalizing nodes that look like navigation or ads. The result is usually the element the human eye would pick as "the content".
+
+It's heuristic, not magic. On pages with unusual layouts (very long sidebars, unconventional HTML) you may need to combine it with [Include and exclude selectors](/home/guides/getting-started/selectors) to get exactly what you want.
+
+## Next
+
+- [Include and exclude selectors](/home/guides/getting-started/selectors)
+- [Formats and extraction](/home/concepts/formats-and-extraction)

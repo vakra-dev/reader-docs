@@ -1,0 +1,157 @@
+---
+title: "Proxy Configuration"
+description: "Set up single proxies, rotation pools, and multi-tier escalation."
+---
+
+Proxies are configured on the `ReaderClient` or per-request via `scrape()` options. This guide covers the three common setups.
+
+## Single proxy per request
+
+The simplest pattern: no client-level config, pass a proxy per call.
+
+```javascript
+import { ReaderClient } from "@vakra-dev/reader";
+
+const reader = new ReaderClient();
+
+const result = await reader.scrape({
+  urls: ["https://example.com"],
+  proxy: {
+    type: "datacenter",
+    host: "proxy.example.com",
+    port: 8080,
+    username: "user",
+    password: "pass",
+  },
+});
+```
+
+You can also pass a full proxy URL:
+
+```javascript
+proxy: {
+  url: "http://user:pass@proxy.example.com:8080",
+}
+```
+
+When `url` is set, all other fields are ignored.
+
+## Flat proxy pool with rotation
+
+If you have multiple proxies of the same tier, configure them on the client and let Reader rotate:
+
+```javascript
+const reader = new ReaderClient({
+  proxies: [
+    { host: "dc1.example.com", port: 8080, username: "u", password: "p" },
+    { host: "dc2.example.com", port: 8080, username: "u", password: "p" },
+    { host: "dc3.example.com", port: 8080, username: "u", password: "p" },
+  ],
+  proxyRotation: "round-robin", // or "random"
+});
+
+// Reader picks the next proxy automatically
+await reader.scrape({
+  urls: ["https://a.com", "https://b.com", "https://c.com"],
+  batchConcurrency: 1,
+});
+```
+
+Use `proxyRotation: "random"` when you want stochastic selection (e.g., to avoid fingerprinting patterns).
+
+## Multi-tier pools (datacenter + residential)
+
+For production, configure both tiers and pick per-request:
+
+```javascript
+const reader = new ReaderClient({
+  proxyPools: {
+    datacenter: [
+      { url: "http://user:pass@dc1.example.com:8080" },
+      { url: "http://user:pass@dc2.example.com:8080" },
+    ],
+    residential: [
+      {
+        type: "residential",
+        host: "residential.proxy-provider.com",
+        port: 12321,
+        username: "customer-abc",
+        password: "secret",
+        country: "us",
+      },
+    ],
+  },
+});
+
+// Explicit datacenter (fast, cheap)
+await reader.scrape({
+  urls: ["https://news.example.com/article"],
+  proxyTier: "datacenter",
+});
+
+// Explicit residential (slow, expensive, bypasses anti-bot)
+await reader.scrape({
+  urls: ["https://www.amazon.com/dp/B08N5WRWNW"],
+  proxyTier: "residential",
+});
+```
+
+## Auto mode with escalation
+
+The best pattern for mixed workloads: `proxyTier: "auto"`. Reader starts with datacenter and escalates to residential only if the request is blocked.
+
+```javascript
+await reader.scrape({
+  urls: unknownUrls,
+  proxyTier: "auto",
+});
+```
+
+You pay datacenter cost for 95% of URLs and residential cost only for the ones that need it.
+
+## Inspecting which proxy was used
+
+Every successful scrape result includes proxy metadata:
+
+```javascript
+const result = await reader.scrape({
+  urls: [...],
+  proxyTier: "auto",
+});
+
+for (const page of result.data) {
+  if (page.metadata.proxy) {
+    console.log(
+      `${page.metadata.baseUrl} via ${page.metadata.proxy.host}:${page.metadata.proxy.port}`
+    );
+  }
+}
+```
+
+Useful for debugging which tier handled which URL.
+
+## Proxy providers
+
+Reader works with any HTTP/HTTPS proxy that supports basic auth. The exact URL format varies by provider — check their docs for the `host:port` and whether they expect `user-session-xxx` style parameters in the username field. Reader handles the sticky session parameter automatically for residential proxies.
+
+## Troubleshooting
+
+### `PROXY_CONNECTION_ERROR` on every request
+Check your proxy credentials and that the proxy is reachable from your machine. Try a manual `curl -x http://user:pass@host:port https://example.com` to verify.
+
+### `PROXY_EXHAUSTED`
+All proxies in all configured tiers failed. Check provider status and whether you've hit a usage limit.
+
+### Residential is slow
+Residential proxies route through real ISPs, adding 300-800ms. This is expected - use them only when datacenter is blocked.
+
+## Where to go next
+
+<CardGroup cols={2}>
+  <Card title="Proxy Tiers concept" icon="arrows-rotate" href="/self-hosted/concepts/proxy-tiers">
+    The mental model for datacenter vs residential.
+  </Card>
+  <Card title="Error Handling" icon="shield-halved" href="/self-hosted/concepts/error-handling">
+    How to catch and retry proxy errors.
+  </Card>
+</CardGroup>

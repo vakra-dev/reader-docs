@@ -1,0 +1,77 @@
+---
+title: "CrawlOptions"
+description: "Every field accepted by crawl() with type and default."
+---
+
+## Required
+
+| Option | Type | Description |
+|---|---|---|
+| `url` | `string` | Seed URL where crawling starts |
+
+## Crawl control
+
+| Option | Type | Default | Description |
+|---|---|---|---|
+| `depth` | `number` | `1` | Max crawl depth from the seed |
+| `maxPages` | `number` | `20` | Max pages to discover (hard limit) |
+| `scrape` | `boolean` | `false` | Also scrape each discovered page |
+| `delayMs` | `number` | `1000` | Delay between requests (rate limiting) |
+| `timeoutMs` | `number` | - | Total crawl timeout |
+
+## URL filtering
+
+| Option | Type | Default | Description |
+|---|---|---|---|
+| `includePatterns` | `string[]` | `[]` | Regex - URL must match at least one |
+| `excludePatterns` | `string[]` | `[]` | Regex - URL must not match any |
+
+Crawling is always same-domain (Reader does not follow external links). Use these patterns to further scope within a domain.
+
+## When scrape: true
+
+These options only apply when `scrape: true`:
+
+| Option | Type | Default | Description |
+|---|---|---|---|
+| `formats` | `Array<"markdown" \| "html">` | `["markdown"]` | Output formats |
+| `scrapeConcurrency` | `number` | `2` | Parallel scrapes during the crawl |
+| `removeAds` | `boolean` | `true` | Remove ad selectors |
+| `removeBase64Images` | `boolean` | `true` | Strip inline base64 images |
+
+## Proxy & misc
+
+| Option | Type | Default | Description |
+|---|---|---|---|
+| `proxy` | `ProxyConfig` | - | Single proxy for this crawl |
+| `proxyTier` | `"datacenter" \| "residential" \| "auto"` | - | Pick a proxy from the configured pool |
+| `userAgent` | `string` | Chrome UA | Custom user agent |
+| `verbose` | `boolean` | `false` | Enable logging |
+| `showChrome` | `boolean` | `false` | Show browser window |
+
+## Example
+
+```javascript
+await reader.crawl({
+  url: "https://docs.example.com",
+  depth: 3,
+  maxPages: 100,
+  scrape: true,
+  scrapeConcurrency: 3,
+  formats: ["markdown"],
+  includePatterns: ["^https://docs\\.example\\.com/(api|guides)/"],
+  excludePatterns: ["/changelog/", "/archive/"],
+  delayMs: 1500,
+});
+```
+
+## Where to go next
+
+<CardGroup cols={2}>
+  <Card title="CrawlResult" icon="file-lines" href="/self-hosted/api-reference/crawl-result">
+    The return type for every crawl call.
+  </Card>
+  <Card title="Crawling concept" icon="sitemap" href="/self-hosted/concepts/crawling">
+    How BFS link discovery works.
+  </Card>
+</CardGroup>

@@ -1,0 +1,90 @@
+---
+title: "Cache not hitting"
+description: "Why repeated requests for the same URL still cost credits, and how to fix it."
+---
+
+You expected a cache hit, but `metadata.cached` is `false` and you were charged credits. This guide walks through the common causes.
+
+## Quick sanity check
+
+A cache hit requires **all** of these:
+
+- Synchronous single-URL scrape mode (not batch, not crawl)
+- Same URL
+- Same extraction options (`onlyMainContent`, `includeTags`, `excludeTags`, `waitForSelector`)
+- Within 24 hours of the original fetch
+- `cache` parameter not set to `false`
+
+If any of these is off, you get a fresh fetch.
+
+## Common causes
+
+### 1. You changed an extraction option
+
+The cache key hashes these fields, so any change creates a new cache entry:
+
+- `onlyMainContent` flipping between `true` and `false`
+- Adding or removing `includeTags` / `excludeTags`
+- Changing `waitForSelector`
+
+If you want cache hits, keep the extraction options stable across runs.
+
+### 2. You're in batch or crawl mode
+
+Only sync single-URL scrapes cache. `urls: [...]` is a batch job and each URL is fetched fresh every time, even if you previously scraped the same URL via the sync path.
+
+**Why?** Batch/crawl jobs are about bulk work; the expectation is "fresh, controlled run". If you want cache behavior for a list of URLs, loop over them with sync scrapes instead:
+
+```ts
+for (const url of urls) {
+  const result = await client.read({ url });
+  // each gets cache-aware handling
+}
+```
+
+(Mind the rate limit; see [Handling rate limits](/home/guides/production/rate-limits).)
+
+### 3. TTL expired
+
+The default cache lifetime is 24 hours. Requests for the same URL more than 24 hours after the original go back to the origin.
+
+### 4. The original scrape failed
+
+Reader doesn't cache failed scrapes. If your first request got a timeout or a 502 and you retry, there's nothing in cache to serve.
+
+### 5. You explicitly disabled cache on the first request
+
+If the first call had `cache: false`, Reader bypassed the cache read **and** wrote the result to cache. But if subsequent callers for that URL were themselves setting `cache: false`, nobody is ever reading the cache.
+
+### 6. URL is actually different
+
+URLs with different query parameters, fragments, or trailing slashes are different cache entries. `https://example.com/page` and `https://example.com/page?utm_source=...` are distinct. Normalize your URLs before scraping if you want the cache to work across callers.
+
+## Confirming with the response
+
+Every scrape response tells you if it was a hit:
+
+```json
+{
+  "data": {
+    "metadata": { "cached": true, "scrapedAt": "2026-04-04T09:00:00Z" }
+  }
+}
+```
+
+On a cache hit, `cached` is `true` and `scrapedAt` is the original fetch time. If you're seeing `cached: false` but expected `true`, one of the causes above applies.
+
+## Forcing a fresh fetch
+
+If you know the content changed and need to bypass:
+
+```ts
+await client.read({ url, cache: false });
+```
+
+Reader fetches fresh AND writes the new result to cache, so the next non-bypass request hits the new entry.
+
+## Next
+
+- [Caching (concept)](/home/concepts/caching)
+- [Cost estimation](/home/guides/production/cost-estimation)

@@ -1,0 +1,141 @@
+---
+title: "Batch Scraping"
+description: "Scrape many URLs in parallel with concurrency, progress tracking, and partial failure handling."
+---
+
+Batch scraping is just `scrape()` with an array of URLs and a concurrency setting. Reader handles the parallelism, browser pool checkout, error tracking, and result aggregation.
+
+## Minimal example
+
+```javascript
+const result = await reader.scrape({
+  urls: [
+    "https://example.com",
+    "https://example.org",
+    "https://example.net",
+  ],
+  formats: ["markdown"],
+  batchConcurrency: 2,
+});
+
+console.log(`Succeeded: ${result.batchMetadata.successfulUrls}`);
+console.log(`Failed:    ${result.batchMetadata.failedUrls}`);
+
+for (const page of result.data) {
+  console.log(page.metadata.website.title);
+}
+```
+
+`batchConcurrency: 2` means Reader processes two URLs in parallel. With the default browser pool of `size: 2`, that fully utilizes both browsers. If you want more parallelism, increase both `size` and `batchConcurrency` together.
+
+## Progress tracking
+
+Pass an `onProgress` callback to get updates as URLs complete:
+
+```javascript
+await reader.scrape({
+  urls: longListOfUrls,
+  batchConcurrency: 5,
+  onProgress: ({ completed, total, currentUrl }) => {
+    console.log(`[${completed}/${total}] ${currentUrl}`);
+  },
+});
+```
+
+The callback fires after each URL finishes (success or failure). It's synchronous - don't do heavy work inside it. For writing progress to a database or emitting events, use `setImmediate` or a small async queue.
+
+## Tuning concurrency
+
+The optimal `batchConcurrency` depends on:
+
+- **Browser pool size** - you can't scrape more URLs in parallel than you have browsers
+- **Target site rate limits** - hammering a single domain from multiple parallel requests will get you rate-limited
+- **Memory** - each concurrent request uses a browser instance (300-500 MB)
+
+A good rule of thumb:
+
+| Scenario | Pool size | Concurrency |
+|---|---|---|
+| Dev, small scripts | 2 | 2 |
+| Scraping many domains | 5 | 5 |
+| Scraping one domain with rate limits | 5 | 1-2 |
+| Large batch across many domains | 10 | 8-10 |
+
+## Handling partial failures
+
+Batch scrapes never throw on individual URL failures. The result's `batchMetadata.errors` array lists the failed URLs:
+
+```javascript
+const result = await reader.scrape({
+  urls: [url1, url2, url3, url4],
+  batchConcurrency: 2,
+  maxRetries: 2, // retry each failed URL twice before giving up
+});
+
+// Successful URLs are in result.data
+for (const page of result.data) {
+  console.log(`✓ ${page.metadata.baseUrl}`);
+}
+
+// Failed URLs are in result.batchMetadata.errors
+for (const { url, error } of result.batchMetadata.errors ?? []) {
+  console.error(`✗ ${url}: ${error}`);
+}
+```
+
+`result.data.length` matches `successfulUrls`, not the input length. If you need to track which input URL corresponds to which output, use a map:
+
+```javascript
+const resultsByUrl = new Map(
+  result.data.map(page => [page.metadata.baseUrl, page])
+);
+
+for (const url of inputUrls) {
+  const page = resultsByUrl.get(url);
+  if (page) {
+    // success
+  } else {
+    // failed - check batchMetadata.errors for details
+  }
+}
+```
+
+## Batch timeout
+
+The `batchTimeoutMs` option sets a total time budget for the entire batch:
+
+```javascript
+await reader.scrape({
+  urls: longList,
+  batchConcurrency: 5,
+  batchTimeoutMs: 300000, // 5 minutes default
+});
+```
+
+If the batch doesn't complete in time, any unfinished URLs fail with a timeout error. Successful URLs up to that point are still returned.
+
+For very long batches (thousands of URLs), consider splitting into smaller chunks and processing them sequentially:
+
+```javascript
+const chunks = chunk(urls, 100); // 100 URLs per chunk
+
+for (const chunkUrls of chunks) {
+  const result = await reader.scrape({
+    urls: chunkUrls,
+    batchConcurrency: 10,
+    batchTimeoutMs: 300000,
+  });
+  // persist results
+}
+```
+
+## Where to go next
+
+<CardGroup cols={2}>
+  <Card title="Browser Pool" icon="boxes-stacked" href="/self-hosted/concepts/browser-pool">
+    Understand how pool size interacts with concurrency.
+  </Card>
+  <Card title="Proxy Configuration" icon="network-wired" href="/self-hosted/guides/proxy-configuration">
+    Rotate proxies across batch requests.
+  </Card>
+</CardGroup>

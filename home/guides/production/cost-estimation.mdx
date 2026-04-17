@@ -1,0 +1,115 @@
+---
+title: "Cost estimation"
+description: "Predict what a batch or crawl will cost before you run it."
+---
+
+Before committing to a 10,000-page scrape, you want a credible estimate of how many credits it'll consume. This guide shows you how to produce one.
+
+## The simple formula
+
+```
+cost = (number of pages) × (credits per page for the mode)
+```
+
+Credits per page:
+
+- `standard`: **1**
+- `stealth`: **3**
+- `auto`: 1 or 3 depending on whether Reader escalates (see below)
+
+Cache hits are **0** regardless of mode, so if you've scraped a URL recently and it's still within the 24h TTL, that specific page is free.
+
+## Estimating for `standard`
+
+Trivial. If you know the page count, you know the cost.
+
+```
+1,000 URLs × 1 credit = 1,000 credits
+```
+
+Force `proxyMode: "standard"` in your request if you want the cost guarantee. Reader will error on a blocked page instead of silently escalating.
+
+## Estimating for `stealth`
+
+Also trivial, just 3x:
+
+```
+1,000 URLs × 3 credits = 3,000 credits
+```
+
+Force this mode only when you know the target site needs it. See [Choosing a proxy mode](/home/guides/advanced/choosing-a-proxy-mode).
+
+## Estimating for `auto`
+
+The hard case. `auto` only costs 3x for the subset of pages that actually escalate. You need an **escalation rate**: the fraction of requests that fall back to stealth.
+
+```
+auto cost = (pages × 1) + (pages × escalation_rate × 2)
+         = pages × (1 + 2 × escalation_rate)
+```
+
+Typical escalation rates by site type:
+
+| Target type | Expected escalation | Effective cost per page |
+| --- | --- | --- |
+| Blogs, docs, news sites | 0–5% | ~1.0–1.1 |
+| Marketing pages, public APIs | 0–10% | ~1.0–1.2 |
+| E-commerce (general) | 20–50% | ~1.4–2.0 |
+| E-commerce (Amazon, Walmart, etc.) | 80–100% | ~2.6–3.0 |
+| LinkedIn, booking sites, aggressive anti-bot | 95–100% | ~2.9–3.0 |
+
+When in doubt, assume 2x (effective cost 1.5 credits per page) for mixed workloads.
+
+## Pilot first
+
+For any batch above a few hundred URLs, run a **pilot** on a representative subset of 50–100 URLs, then measure the real escalation rate:
+
+```ts
+const pilot = await client.read({ urls: sampleUrls });
+let escalated = 0;
+let total = 0;
+
+if (pilot.kind === "job") {
+  for (const page of pilot.data.results) {
+    if (page.error) continue;
+    total += 1;
+    if (page.proxyMode === "stealth") escalated += 1;
+  }
+}
+
+const escalationRate = escalated / total;
+const estimatedCost =
+  allUrls.length * (1 + 2 * escalationRate);
+
+console.log(
+  `Pilot escalation: ${(escalationRate * 100).toFixed(0)}%, ` +
+    `estimated total cost: ${estimatedCost.toFixed(0)} credits`,
+);
+```
+
+Now you have a real number grounded in the actual site you're targeting, not a guess.
+
+## Crawl cost
+
+Crawls charge `crawlPerPage` (flat 1 credit per page discovered) plus the scrape cost per page:
+
+```
+crawl cost ≈ (pages discovered) × 1 credit
+```
+
+Crawls are single-credit-per-page because they run in a mode optimized for link discovery. The trick with crawls is that `pages discovered` is hard to predict without running the crawl; set `maxPages` as a hard cap so worst-case spend is bounded.
+
+## Reading the bill afterwards
+
+After the run, `/v1/usage/history` shows per-request cost broken down by `proxyMode`. The sum of the `credits` column is your actual spend.
+
+```ts
+const logs = await client.request("GET", "/v1/usage/history?limit=100");
+const total = logs.data.reduce((sum, entry) => sum + entry.credits, 0);
+console.log(`Last 100 requests: ${total} credits`);
+```
+
+## Next
+
+- [Credit exhaustion](/home/guides/production/credit-exhaustion)
+- [Choosing a proxy mode](/home/guides/advanced/choosing-a-proxy-mode)

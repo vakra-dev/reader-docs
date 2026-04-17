@@ -1,0 +1,154 @@
+---
+title: "Retry and error handling"
+description: "Which error codes to retry, how to back off, and when to give up."
+---
+
+Reader returns 11 stable error codes. Your retry logic should branch on `error.code`, not on HTTP status or error message. This guide gives you the exact rules.
+
+## The retry matrix
+
+| Code | Retry? | Strategy |
+| --- | --- | --- |
+| `invalid_request` | No | Fix the request |
+| `unauthenticated` | No | Fix the key |
+| `insufficient_credits` | No | Top up or wait for reset |
+| `url_blocked` | No | Use a different URL |
+| `not_found` | No | Fix the ID |
+| `conflict` | No | Check state first |
+| `rate_limited` | **Yes** | Honor `Retry-After` header |
+| `concurrency_limited` | **Yes** | Wait for active jobs to finish |
+| `internal_error` | **Yes** | Exponential backoff |
+| `upstream_unavailable` | **Yes** | Exponential backoff |
+| `scrape_timeout` | **Yes** | Exponential backoff, maybe bump `timeoutMs` |
+
+## Using the SDK (recommended)
+
+The JS and Python SDKs implement this matrix automatically. Transient codes get retried with exponential backoff; permanent codes throw immediately.
+
+```ts
+import {
+  ReaderClient,
+  InsufficientCreditsError,
+  RateLimitedError,
+  ScrapeTimeoutError,
+} from "@vakra-dev/reader-js";
+
+const client = new ReaderClient({
+  apiKey: process.env.READER_KEY!,
+  maxRetries: 3, // default is 2
+});
+
+try {
+  const result = await client.read({ url });
+  // handle result
+} catch (err) {
+  if (err instanceof InsufficientCreditsError) {
+    console.error(`Need ${err.required}, have ${err.available}`);
+    // Pause the worker, alert ops
+  } else if (err instanceof RateLimitedError) {
+    // SDK already retried. If we still got here, we exhausted retries
+    console.error(`Give up after rate limit, retry in ${err.retryAfterSeconds}s`);
+  } else if (err instanceof ScrapeTimeoutError) {
+    // Bump timeout and try once more manually
+    await client.read({ url, timeoutMs: 60_000 });
+  } else {
+    throw err; // unknown, re-raise
+  }
+}
+```
+
+## Manual retry (no SDK)
+
+If you're calling the HTTP API directly:
+
+```ts
+const TRANSIENT_CODES = new Set([
+  "rate_limited",
+  "concurrency_limited",
+  "internal_error",
+  "upstream_unavailable",
+  "scrape_timeout",
+]);
+
+async function readWithRetry(body, maxAttempts = 3) {
+  let lastError;
+
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    const res = await fetch("https://api.reader.dev/v1/read", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-key": process.env.READER_KEY,
+      },
+      body: JSON.stringify(body),
+    });
+
+    const envelope = await res.json();
+    if (envelope.success) return envelope.data;
+
+    const code = envelope.error.code;
+    lastError = envelope.error;
+
+    // Permanent? Give up.
+    if (!TRANSIENT_CODES.has(code)) throw new Error(envelope.error.message);
+
+    // Rate-limited? Honor the server's hint.
+    if (code === "rate_limited") {
+      const retryAfter =
+        parseInt(res.headers.get("Retry-After") || "") ||
+        envelope.error.details?.retryAfterSeconds ||
+        5;
+      await sleep(retryAfter * 1000);
+      continue;
+    }
+
+    // Otherwise exponential backoff: 1s, 2s, 4s
+    await sleep(Math.pow(2, attempt) * 1000);
+  }
+
+  throw new Error(`Exhausted retries: ${lastError?.message}`);
+}
+```
+
+## Backoff schedules
+
+The classic exponential schedule with jitter:
+
+```
+delay = base * 2^attempt + random(0, jitter)
+```
+
+For Reader, reasonable values:
+
+- `base` = 1 second
+- `jitter` = 500ms
+- Cap total retries at 3–5 for interactive calls, 10+ for background workers
+
+Jitter matters when many workers hit a rate limit at the same time; without it they all retry on the exact same schedule and keep colliding.
+
+## Logging
+
+When you give up on a retry, log the full error envelope:
+
+```ts
+console.error({
+  code: err.code,
+  message: err.message,
+  details: err.details,
+  docsUrl: err.docsUrl,
+  requestId: err.requestId,
+  url: body.url,
+});
+```
+
+The `requestId` is the critical field for support tickets: it lets Reader's logs find your exact request.
+
+## Circuit breakers
+
+For production workers, add a circuit breaker on top of retries: if the last N requests all failed, stop trying and alert. Otherwise a sustained Reader outage causes your worker to retry forever and drive your rate limit through the floor.
+
+## Next
+
+- [Handling rate limits](/home/guides/production/rate-limits)
+- [Credit exhaustion](/home/guides/production/credit-exhaustion)
+- [Monitoring](/home/guides/production/monitoring)

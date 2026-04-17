@@ -1,0 +1,83 @@
+---
+title: "Polling a job to completion"
+description: "The simplest async pattern: fetch status on an interval until terminal."
+---
+
+Polling is the hello-world of async jobs. Fire a request, get a job ID, and then call `GET /v1/jobs/{id}` on a loop until `status` becomes `completed`, `failed`, or `cancelled`.
+
+## The minimal loop
+
+```ts
+import { ReaderClient } from "@vakra-dev/reader-js";
+
+const client = new ReaderClient({ apiKey: process.env.READER_KEY! });
+
+const result = await client.read({
+  urls: ["https://example.com/a", "https://example.com/b"],
+});
+
+if (result.kind === "job") {
+  // `client.read` auto-polls via waitForJob and returns the completed job.
+  // All pages are collected.
+  for (const page of result.data.results) {
+    console.log(page.url, page.markdown?.length);
+  }
+}
+```
+
+`client.read` for batches and crawls implicitly calls `waitForJob`, so you get a completed job back without writing any loop yourself. That's enough for most scripts and CLI tools.
+
+## When you want explicit control
+
+If you want to show progress, set a custom timeout, or break out early, call `getJob` directly:
+
+```ts
+const { data: job } = await client.request("POST", "/v1/read", {
+  urls: ["https://example.com/a", "https://example.com/b"],
+});
+const jobId = job.id;
+
+const timeout = 5 * 60_000; // 5 minutes
+const start = Date.now();
+
+while (Date.now() - start < timeout) {
+  const { job } = await client.getJob(jobId, { limit: 1 });
+
+  console.log(`${job.status}: ${job.completed}/${job.total}`);
+
+  if (["completed", "failed", "cancelled"].includes(job.status)) {
+    if (job.status === "completed") {
+      const allResults = await client.getAllJobResults(jobId);
+      console.log(`Finished: ${allResults.length} pages`);
+    } else {
+      console.error(`Job ${job.status}: ${job.error}`);
+    }
+    break;
+  }
+
+  await new Promise((r) => setTimeout(r, 2000));
+}
+```
+
+## Polling interval
+
+Reader's rate limit is per minute. Polling a single job at 2-second intervals is 30 requests per minute, already eating half your free-tier quota on one job. Tune the interval:
+
+| Expected job duration | Interval |
+| --- | --- |
+| Under 10 seconds | 1–2 seconds |
+| 10 seconds to a minute | 2–5 seconds |
+| A few minutes | 5–15 seconds |
+| Longer than 5 minutes | Use webhooks instead |
+
+The longer the job, the wider the interval; you lose nothing by polling less frequently when the job is big.
+
+## What counts against credits
+
+Polling does **not** consume credits. Only `/v1/read` requests spend credits. It does, however, count toward your **rate limit** (see above).
+
+## Next
+
+- [SSE streaming](/home/guides/async-workflows/sse-streaming): realtime updates instead of polling
+- [Webhook workflows](/home/guides/async-workflows/webhook-workflows): skip polling entirely
+- [Polling vs SSE vs webhooks](/home/guides/async-workflows/polling-vs-sse-vs-webhooks)

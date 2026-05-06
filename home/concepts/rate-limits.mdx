@@ -14,14 +14,11 @@ Reader enforces two kinds of limits, and they're independent. Understanding both
 
 A request can hit both, but usually you'll hit rate limits first if you're firing sync scrapes in a loop, and concurrency first if you're kicking off batches or crawls.
 
-## Limits by tier
+## Limits
 
-| Tier | Rate (req/min) | Concurrency (active jobs) |
-| --- | --- | --- |
-| Free | 10 | 2 |
-| Pro | 60 | 10 |
-| Business | 200 | 50 |
-| Enterprise | 1,000 | 200 |
+| Rate (req/min) | Concurrency (active jobs) |
+| --- | --- |
+| 60 | 10 |
 
 ## Rate limit errors
 
@@ -66,7 +63,7 @@ Sync scrapes (single-URL `POST /v1/read`) are not jobs. They don't count toward 
 
 ## Per-key rate limits
 
-On Pro and above, you can set a custom RPM override on individual API keys, useful when you want different keys to share a workspace quota but cap each one. This is managed in the dashboard.
+You can set a custom RPM override on individual API keys, useful when you want different keys to share a workspace quota but cap each one. This is managed in the dashboard.
 
 ## Strategies for hitting limits
 

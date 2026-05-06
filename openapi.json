@@ -702,10 +702,7 @@
           "tier": {
             "type": "string",
             "enum": [
-              "free",
-              "pro",
-              "business",
-              "enterprise"
+              "free"
             ]
           },
           "resetAt": {
@@ -1039,7 +1036,7 @@
                   "success": false,
                   "error": {
                     "code": "insufficient_credits",
-                    "message": "You need 50 credits but only 10 are available. Upgrade your plan or wait for the next billing cycle.",
+                    "message": "You need 50 credits but only 10 are available. Wait for your credits to reset at the next billing cycle.",
                     "details": {
                       "required": 50,
                       "available": 10,
@@ -1055,7 +1052,7 @@
                       "success": false,
                       "error": {
                         "code": "insufficient_credits",
-                        "message": "You need 50 credits but only 10 are available. Upgrade your plan or wait for the next billing cycle.",
+                        "message": "You need 50 credits but only 10 are available. Wait for your credits to reset at the next billing cycle.",
                         "details": {
                           "required": 50,
                           "available": 10,

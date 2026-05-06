@@ -1,0 +1,82 @@
+---
+title: "Browser Sessions"
+description: "Launch stealthed Chrome for Playwright/Puppeteer automation"
+---
+
+# Browser Sessions
+
+The `browser()` primitive launches a Hero-stealthed Chrome and returns a CDP WebSocket URL. Connect Playwright or Puppeteer to automate pages with anti-bot stealth active.
+
+## How It Works
+
+```
+reader.browser()
+    │
+    ├── Creates a dedicated HeroCore instance
+    ├── Launches Chrome with stealth emulation scripts
+    ├── Extracts CDP WebSocket URL
+    ├── Disables internal target tracking for external clients
+    │
+    ▼
+session.wsEndpoint  →  Playwright/Puppeteer connects
+```
+
+Each session gets its own Chrome process, separate from the scrape/crawl browser pool. This isolates sessions from scraping throughput.
+
+## Stealth Features
+
+Sessions inherit Hero's emulation scripts:
+
+| Feature | Active | Mechanism |
+|---------|--------|-----------|
+| `webdriver = false` | Yes | `Page.addScriptToEvaluateOnNewDocument` |
+| Navigator spoofing | Yes | injected at BrowserContext level |
+| WebGL fingerprinting | Yes | injected at BrowserContext level |
+| WebRTC IP masking | Yes | injected at BrowserContext level |
+| TLS fingerprinting (MITM) | No | MITM proxy disabled for sessions |
+
+**Note on MITM:** Hero's TLS fingerprint emulation uses a MITM proxy that tracks connections by socket. External CDP clients create new sockets the MITM can't track, so it's disabled for sessions. The emulation scripts provide the primary stealth layer without MITM.
+
+## Usage
+
+```typescript
+import { ReaderClient } from "@vakra-dev/reader";
+import { chromium } from "playwright-core";
+
+const reader = new ReaderClient();
+const session = await reader.browser({ timeoutMs: 300_000 });
+
+const browser = await chromium.connectOverCDP(session.wsEndpoint);
+const context = await browser.newContext();
+const page = await context.newPage();
+
+await page.goto("https://example.com");
+console.log(await page.title());
+
+await browser.close();
+await session.close();
+```
+
+## CLI
+
+```bash
+# Create session (standalone)
+reader browser create --standalone
+
+# With daemon running
+reader browser create
+reader browser list
+reader browser stop <sessionId>
+```
+
+## Resource Usage
+
+- Each session uses ~300MB memory (Chrome + HeroCore)
+- Sessions are isolated from the scrape/crawl pool
+- Default timeout: 5 minutes (configurable via `timeoutMs`)
+
+## Related
+
+- [Browser Sessions Guide](/self-hosted/guides/browser-sessions) - Full examples
+- [API Reference](/self-hosted/api-reference/browser-session) - Options and types
+- [Browser Pool](/self-hosted/concepts/browser-pool) - Shared pool used by scrape/crawl

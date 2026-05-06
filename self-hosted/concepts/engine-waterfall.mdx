@@ -3,13 +3,13 @@ title: "Scraping Engine"
 description: "Hero browser engine with proxy escalation for reliable scraping."
 ---
 
-Reader uses a single scraping engine: **Hero** — a full headless Chrome browser via the [Ulixee Hero](https://ulixee.org/) framework. Every scrape runs through Hero, which handles JavaScript execution, TLS fingerprinting, and anti-bot bypass natively.
+Reader uses a single scraping engine: **Hero** - a full headless Chrome browser via the [Ulixee Hero](https://ulixee.org/) framework. Every scrape runs through Hero, which handles JavaScript execution, TLS fingerprinting, and anti-bot bypass natively.
 
 ## Why a single engine?
 
-A browser engine handles everything a simpler HTTP client can, plus everything it can't. Sites that serve static HTML work fine in a browser. Sites that require JavaScript, handle Cloudflare challenges, or check TLS fingerprints also work — because it's a real browser.
+A browser engine handles everything a simpler HTTP client can, plus everything it can't. Sites that serve static HTML work fine in a browser. Sites that require JavaScript, handle Cloudflare challenges, or check TLS fingerprints also work - because it's a real browser.
 
-The tradeoff is speed: a plain HTTP fetch completes in ~100ms, while a browser page load takes 1-5 seconds. In practice, the reliability gain far outweighs the latency cost — failed scrapes that require retries are slower than a single browser-based scrape that succeeds on the first try.
+The tradeoff is speed: a plain HTTP fetch completes in ~100ms, while a browser page load takes 1-5 seconds. In practice, the reliability gain far outweighs the latency cost - failed scrapes that require retries are slower than a single browser-based scrape that succeeds on the first try.
 
 ## How a scrape runs
 
@@ -34,13 +34,13 @@ Attempt 1: Hero on datacenter proxy (10s timeout)
     ↓ any failure (timeout, empty, blocked, error)
 Attempt 2: Hero on residential proxy (remaining time, up to 30s total)
     ↓ any failure
-    Done — report error
+    Done - report error
 ```
 
 - **Datacenter proxies** are fast and cheap. They work for most sites.
 - **Residential proxies** use real household IPs. They bypass anti-bot systems that block datacenter IP ranges.
 
-If the first attempt fails for any reason — timeout, empty content, HTTP error, or bot detection — the scraper automatically escalates to a residential proxy and tries again. If that also fails, the URL is reported as failed.
+If the first attempt fails for any reason - timeout, empty content, HTTP error, or bot detection - the scraper automatically escalates to a residential proxy and tries again. If that also fails, the URL is reported as failed.
 
 The timeouts are configurable via `hardDeadlineMs` (total cap, default 30s) and `datacenterTimeoutMs` (first attempt, default 10s).
 
@@ -52,7 +52,7 @@ After Hero returns HTML, the orchestrator runs a minimal quality check:
 - **HTTP 2xx with empty body** → fail (`empty_content`)
 - **HTTP 4xx/5xx with empty body** → fail (`http_error`)
 
-Bot page detection (200 + block content) is handled separately by the scraper's block detection config, which is provided by the caller — Reader itself is unopinionated about what constitutes a "blocked" page.
+Bot page detection (200 + block content) is handled separately by the scraper's block detection config, which is provided by the caller - Reader itself is unopinionated about what constitutes a "blocked" page.
 
 ## Where to go next
 

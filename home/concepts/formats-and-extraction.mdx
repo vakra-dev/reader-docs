@@ -14,7 +14,7 @@ Pass `formats` on the request to choose what comes back:
 | `"markdown"` (default) | Clean, structured markdown. Headings, lists, links, code blocks preserved. Best for LLMs and RAG. |
 | `"html"` | The cleaned HTML Reader used as the source for markdown conversion. Useful when you need to run your own DOM parsing. |
 
-Every response also includes `rawHtml` — the unprocessed HTML exactly as the browser rendered it, before any cleaning or content extraction. This is always returned regardless of `formats`.
+Every response also includes `rawHtml` - the unprocessed HTML exactly as the browser rendered it, before any cleaning or content extraction. This is always returned regardless of `formats`.
 
 You can request both:
 

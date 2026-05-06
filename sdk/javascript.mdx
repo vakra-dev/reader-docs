@@ -281,9 +281,55 @@ import type {
 } from "@vakra-dev/reader-js";
 ```
 
+## Browser Sessions
+
+Create stealthed browser sessions for Playwright/Puppeteer automation:
+
+```typescript
+import { ReaderClient } from "@vakra-dev/reader-js";
+import { chromium } from "playwright-core";
+
+const client = new ReaderClient({ apiKey: "rdr_..." });
+
+// Create a session
+const session = await client.sessions.create();
+console.log(session.wsEndpoint);
+
+// Connect Playwright
+const browser = await chromium.connectOverCDP(session.wsEndpoint);
+const page = await (await browser.newContext()).newPage();
+await page.goto("https://example.com");
+console.log(await page.title());
+
+// Cleanup
+await browser.close();
+await client.sessions.stop(session.sessionId);
+```
+
+### Sessions API
+
+| Method | Description |
+|--------|-------------|
+| `client.sessions.create(params?)` | Create a session, returns `SessionInfo` with `wsEndpoint` |
+| `client.sessions.get(sessionId)` | Get session status |
+| `client.sessions.stop(sessionId)` | Stop a session, returns billing summary |
+| `client.sessions.list()` | List active sessions |
+
+### Session Types
+
+```typescript
+import type {
+  SessionInfo,
+  CreateSessionParams,
+  StopSessionResult,
+  SessionStatus,
+} from "@vakra-dev/reader-js";
+```
+
 ## Next
 
 - [Python SDK](/sdk/python): same features, Pythonic API
+- [Browser Sessions](/home/concepts/browser-sessions): concept overview
 - [Errors](/home/concepts/errors): full error code catalog
 - [Proxy modes](/home/concepts/proxy-modes): when to override the default
 - [API reference](/api-reference/read): the raw HTTP contract

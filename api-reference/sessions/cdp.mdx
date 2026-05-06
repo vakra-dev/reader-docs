@@ -1,0 +1,110 @@
+---
+title: "CDP WebSocket Proxy"
+description: "Connect Playwright/Puppeteer to a browser session via CDP"
+---
+
+# CDP WebSocket Proxy
+
+After creating a session, connect to the CDP WebSocket endpoint to control the browser.
+
+## Endpoint
+
+```
+WSS /v1/sessions/{id}/cdp?token={token}
+```
+
+The `wsEndpoint` returned by `POST /v1/sessions` includes the full URL with token. Pass it directly to Playwright or Puppeteer.
+
+## Authentication
+
+The WebSocket proxy authenticates via the `token` query parameter (not the API key). The token is returned in the session creation response and is tied to that specific session.
+
+## Playwright
+
+```typescript
+const session = await client.sessions.create();
+const browser = await chromium.connectOverCDP(session.wsEndpoint);
+const context = await browser.newContext();
+const page = await context.newPage();
+
+await page.goto("https://example.com");
+console.log(await page.title());
+
+await page.screenshot({ path: "screenshot.png" });
+await page.pdf({ path: "page.pdf" });
+
+const cookies = await context.cookies();
+```
+
+## Puppeteer
+
+```typescript
+const session = await client.sessions.create();
+const browser = await connect({
+  browserWSEndpoint: session.wsEndpoint,
+  defaultViewport: null,
+});
+
+const page = await browser.newPage();
+await page.goto("https://example.com");
+```
+
+## Raw CDP
+
+```typescript
+const ws = new WebSocket(session.wsEndpoint);
+
+// Create a page
+const target = await sendCDP(ws, "Target.createTarget", { url: "about:blank" });
+const attached = await sendCDP(ws, "Target.attachToTarget", {
+  targetId: target.targetId,
+  flatten: true,
+});
+
+// Navigate
+await sendPageCDP(ws, attached.sessionId, "Page.navigate", {
+  url: "https://example.com",
+});
+```
+
+## Blocked CDP Commands
+
+The proxy filters dangerous CDP commands for security. These methods are blocked and return a JSON-RPC error:
+
+| Method | Reason |
+|--------|--------|
+| `Browser.close` | Would kill the browser process |
+| `Target.createBrowserContext` | Resource abuse, bypasses isolation |
+| `Target.disposeBrowserContext` | Could destroy the session context |
+| `SystemInfo.getProcessInfo` | Leaks server process information |
+
+All other CDP methods (Page, Runtime, Network, DOM, etc.) pass through normally.
+
+### Error Response for Blocked Commands
+
+```json
+{
+  "id": 42,
+  "error": {
+    "code": -32601,
+    "message": "Method not allowed: Browser.close"
+  }
+}
+```
+
+## Connection Lifecycle
+
+- **Connect:** Playwright/Puppeteer opens a WebSocket to the proxy URL
+- **Relay:** The proxy authenticates the token and relays CDP frames to the browser
+- **Disconnect:** When either side closes, the other is also closed
+- **Timeout:** Sessions auto-close after the configured timeout
+
+## Stealth
+
+The browser has anti-bot stealth active regardless of which client connects:
+
+- `navigator.webdriver = false`
+- Navigator/WebGL/WebRTC spoofing
+- Chrome plugin array simulation
+
+These are injected at the browser level and apply to all pages, including new pages created by Playwright/Puppeteer.

@@ -1,0 +1,35 @@
+---
+title: "List Sessions"
+api: "GET /v1/sessions"
+description: "List active browser sessions for your workspace"
+---
+
+Returns all active browser sessions for your workspace.
+
+## Request
+
+### Headers
+
+| Header | Required | Description |
+|--------|----------|-------------|
+| `x-api-key` | Yes | Your API key |
+
+## Response
+
+### 200 OK
+
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "sessionId": "ses_a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+      "status": "active",
+      "createdAt": "2026-04-30T12:00:00.000Z",
+      "expiresAt": "2026-04-30T13:00:00.000Z"
+    }
+  ]
+}
+```
+
+Returns an empty array if no active sessions exist.

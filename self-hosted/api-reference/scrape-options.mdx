@@ -19,11 +19,8 @@ description: "Every field accepted by scrape() with type and default."
 
 | Option | Type | Default | Description |
 |---|---|---|---|
-| `userAgent` | `string` | Chrome UA | Custom user agent string |
-| `headers` | `Record<string, string>` | `{}` | Additional HTTP headers |
 | `timeoutMs` | `number` | `30000` | Request timeout per URL |
 | `waitForSelector` | `string` | - | Wait for this CSS selector before extracting |
-| `skipTLSVerification` | `boolean` | `true` | Skip TLS certificate verification |
 
 ## Content cleaning
 
@@ -49,7 +46,6 @@ description: "Every field accepted by scrape() with type and default."
 |---|---|---|---|
 | `batchConcurrency` | `number` | `1` | Number of URLs to process in parallel |
 | `batchTimeoutMs` | `number` | `300000` | Total timeout for the batch (5 min) |
-| `maxRetries` | `number` | `2` | Max retries per URL before giving up |
 | `onProgress` | `(p: ProgressEvent) => void` | - | Progress callback |
 
 ```typescript
@@ -99,13 +95,6 @@ interface UrlRewriteRule {
   rewrite: (url: URL) => string;
 }
 ```
-
-## URL filtering
-
-| Option | Type | Default | Description |
-|---|---|---|---|
-| `includePatterns` | `string[]` | `[]` | Regex patterns - URL must match at least one |
-| `excludePatterns` | `string[]` | `[]` | Regex patterns - URL must not match any |
 
 ## Debugging
 

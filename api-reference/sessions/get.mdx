@@ -1,0 +1,51 @@
+---
+title: "Get Session"
+api: "GET /v1/sessions/{id}"
+description: "Get the status of a browser session"
+---
+
+Retrieve the current status of a browser session.
+
+## Request
+
+### Headers
+
+| Header | Required | Description |
+|--------|----------|-------------|
+| `x-api-key` | Yes | Your API key |
+
+### Path Parameters
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `id` | `string` | Session ID |
+
+## Response
+
+### 200 OK
+
+```json
+{
+  "success": true,
+  "data": {
+    "sessionId": "ses_a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+    "status": "active",
+    "createdAt": "2026-04-30T12:00:00.000Z",
+    "expiresAt": "2026-04-30T13:00:00.000Z"
+  }
+}
+```
+
+### Status Values
+
+| Status | Description |
+|--------|-------------|
+| `active` | Session is running, CDP endpoint is connectable |
+| `stopped` | Session was explicitly stopped |
+| `expired` | Session reached its timeout limit |
+
+## Errors
+
+| Code | Status | Description |
+|------|--------|-------------|
+| `session_not_found` | 404 | Session does not exist or belongs to another workspace |

@@ -1,0 +1,184 @@
+---
+title: "Browser Sessions"
+description: "Full examples for Playwright, Puppeteer, and raw CDP browser automation"
+---
+
+# Browser Sessions Guide
+
+This guide shows how to use Reader's `browser()` primitive for full browser automation with anti-bot stealth.
+
+## Playwright
+
+```typescript
+import { ReaderClient } from "@vakra-dev/reader";
+import { chromium } from "playwright-core";
+
+const reader = new ReaderClient();
+const session = await reader.browser();
+
+const browser = await chromium.connectOverCDP(session.wsEndpoint);
+const context = await browser.newContext();
+const page = await context.newPage();
+
+// Navigate and extract data
+await page.goto("https://news.ycombinator.com/");
+const stories = await page.evaluate(() =>
+  Array.from(document.querySelectorAll(".athing")).slice(0, 5).map((row) => ({
+    title: row.querySelector(".titleline > a")?.textContent,
+  }))
+);
+console.log(stories);
+
+// Screenshots and PDFs
+await page.screenshot({ path: "page.png", fullPage: true });
+
+// Cleanup
+await browser.close();
+await session.close();
+await reader.close();
+```
+
+Install: `npm install playwright-core`
+
+## Puppeteer
+
+```typescript
+import { ReaderClient } from "@vakra-dev/reader";
+import { connect } from "puppeteer-core";
+
+const reader = new ReaderClient();
+const session = await reader.browser();
+
+const browser = await connect({
+  browserWSEndpoint: session.wsEndpoint,
+  defaultViewport: null,
+});
+
+const page = await browser.newPage();
+await page.goto("https://example.com");
+console.log(await page.title());
+
+await browser.close();
+await session.close();
+await reader.close();
+```
+
+Install: `npm install puppeteer-core`
+
+## Raw CDP (Any Language)
+
+For tools that speak the Chrome DevTools Protocol directly:
+
+```typescript
+import WebSocket from "ws";
+
+const reader = new ReaderClient();
+const session = await reader.browser();
+
+const ws = new WebSocket(session.wsEndpoint);
+await new Promise((resolve) => ws.on("open", resolve));
+
+let cmdId = 0;
+function send(method, params = {}, sessionId) {
+  const id = ++cmdId;
+  return new Promise((resolve) => {
+    const handler = (data) => {
+      const msg = JSON.parse(data.toString());
+      if (msg.id === id) {
+        ws.off("message", handler);
+        resolve(msg.result);
+      }
+    };
+    ws.on("message", handler);
+    ws.send(JSON.stringify({ id, method, params, ...(sessionId && { sessionId }) }));
+  });
+}
+
+// Create a page and navigate
+const target = await send("Target.createTarget", { url: "about:blank" });
+const attached = await send("Target.attachToTarget", {
+  targetId: target.targetId,
+  flatten: true,
+});
+
+await send("Page.enable", {}, attached.sessionId);
+await send("Page.navigate", { url: "https://example.com" }, attached.sessionId);
+
+// Wait for load, then get title
+const title = await send("Runtime.evaluate", {
+  expression: "document.title",
+}, attached.sessionId);
+console.log(title.result.value);
+
+ws.close();
+await session.close();
+await reader.close();
+```
+
+## Interactive Actions
+
+Click, type, search, and extract results:
+
+```typescript
+const session = await reader.browser();
+const browser = await chromium.connectOverCDP(session.wsEndpoint);
+const page = await (await browser.newContext()).newPage();
+
+// Navigate
+await page.goto("https://hn.algolia.com/");
+
+// Type a search query
+await page.locator('input[type="search"]').pressSequentially("web scraping", { delay: 50 });
+await page.waitForTimeout(3000); // Wait for instant search
+
+// Extract results
+const results = await page.evaluate(() =>
+  Array.from(document.querySelectorAll(".Story")).slice(0, 5).map((el) => ({
+    title: el.querySelector(".Story_title a")?.textContent?.trim(),
+  }))
+);
+
+console.log(results);
+await session.close();
+```
+
+## CLI
+
+```bash
+# Create a session (standalone mode)
+reader browser create --standalone --show-chrome
+
+# With daemon running
+reader browser create
+reader browser list
+reader browser stop <sessionId>
+```
+
+The `create` command prints a JSON object with `sessionId` and `wsEndpoint`, then blocks until Ctrl+C or timeout.
+
+## With Proxy
+
+```typescript
+const session = await reader.browser({
+  proxy: { url: "http://user:pass@proxy:8080" },
+});
+```
+
+Or use the configured proxy pool:
+
+```typescript
+const reader = new ReaderClient({
+  proxyPools: {
+    datacenter: [{ url: "http://dc-proxy:8080" }],
+  },
+});
+
+const session = await reader.browser({ proxyTier: "datacenter" });
+```
+
+## Notes
+
+- Each session uses ~300MB memory (separate Chrome process)
+- Default timeout: 5 minutes (`timeoutMs: 300000`)
+- Sessions are isolated from the scrape/crawl browser pool
+- Always call `session.close()` when done to release resources

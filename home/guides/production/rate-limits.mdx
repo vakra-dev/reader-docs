@@ -7,14 +7,7 @@ Reader has two limits: requests per minute (RPM) and concurrent jobs. This guide
 
 ## Know your quota
 
-| Tier | RPM | Concurrency |
-| --- | --- | --- |
-| Free | 10 | 2 |
-| Pro | 60 | 10 |
-| Business | 200 | 50 |
-| Enterprise | 1,000 | 200 |
-
-60 RPM on Pro means one request per second, every second. If your pipeline can burst above that, you'll get 429s. Design for the average, not the peak.
+Your account has **60 RPM** and **10 concurrent jobs**. 60 RPM means one request per second, every second. If your pipeline can burst above that, you'll get 429s. Design for the average, not the peak.
 
 ## Rule #1: batch where you can
 
@@ -98,7 +91,7 @@ For long jobs, prefer webhooks over polling so the job doesn't consume any of yo
 
 If you have both user-facing requests and background workers sharing one API key, the background workers will eat the rate budget and starve the users. Two options:
 
-1. **Two API keys, two rate limit overrides** (Pro+): set a low RPM override on the background key so interactive traffic always has room.
+1. **Two API keys, two rate limit overrides**: set a low RPM override on the background key so interactive traffic always has room.
 2. **A queue in front of background work**: let background requests wait, never throttle interactive requests.
 
 ## Detecting approaching limits

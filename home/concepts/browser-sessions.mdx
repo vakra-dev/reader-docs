@@ -1,0 +1,84 @@
+---
+title: "Browser Sessions"
+description: "Launch stealthed browsers for full automation with Playwright and Puppeteer"
+---
+
+# Browser Sessions
+
+Browser sessions give you a full browser instance with anti-bot stealth active. Instead of getting back markdown, you get a CDP (Chrome DevTools Protocol) WebSocket URL that Playwright or Puppeteer can connect to.
+
+## When to Use Sessions
+
+| Use case | Best primitive |
+|----------|---------------|
+| Extract content from a URL | `POST /v1/read` (scrape) |
+| Discover pages on a site | `POST /v1/read` (crawl) |
+| Click buttons, fill forms, multi-step flows | **Sessions** |
+| Scrape behind login/auth walls | **Sessions** |
+| Take screenshots, generate PDFs | **Sessions** |
+| Run existing Playwright scripts with stealth | **Sessions** |
+
+## How It Works
+
+1. **Create a session** via `POST /v1/sessions`
+2. **Connect Playwright/Puppeteer** to the returned `wsEndpoint`
+3. **Use normally** - navigate, click, type, evaluate, screenshot
+4. **Stop the session** via `DELETE /v1/sessions/:id`
+
+The browser has anti-bot stealth active: `navigator.webdriver = false`, navigator/WebGL spoofing, WebRTC masking. Your automation looks like a real user.
+
+## Quick Example
+
+```typescript
+import { ReaderClient } from "@vakra-dev/reader-js";
+import { chromium } from "playwright-core";
+
+const client = new ReaderClient({ apiKey: process.env.READER_API_KEY });
+
+// One API call to create a stealthed browser
+const session = await client.sessions.create();
+
+// One-line change from a local Playwright script
+const browser = await chromium.connectOverCDP(session.wsEndpoint);
+const page = (await browser.contexts())[0].pages()[0] || await (await browser.newContext()).newPage();
+
+await page.goto("https://example.com");
+console.log(await page.title());
+
+// Cleanup
+await browser.close();
+await client.sessions.stop(session.sessionId);
+```
+
+## Stealth Features
+
+Every session includes:
+
+- `navigator.webdriver = false` (the #1 bot detection signal)
+- Navigator property spoofing (deviceMemory, hardwareConcurrency, platform)
+- WebGL/Canvas fingerprint randomization
+- WebRTC IP leak prevention
+- Chrome plugin array simulation
+
+## Billing
+
+Sessions are billed at **1 credit per minute**. The timer starts on creation and stops when the session is closed or expires.
+
+Sessions auto-close after the configured timeout (default: 60 minutes max).
+
+## Supported Clients
+
+| Client | Connection method |
+|--------|------------------|
+| Playwright | `chromium.connectOverCDP(wsEndpoint)` |
+| Puppeteer | `connect({ browserWSEndpoint: wsEndpoint })` |
+| Raw CDP | WebSocket to `wsEndpoint` directly |
+
+Selenium via chromedriver is not supported (requires exclusive Chrome access).
+
+## Related
+
+- [API Reference: Create Session](/api-reference/sessions/create)
+- [API Reference: CDP Proxy](/api-reference/sessions/cdp)
+- [JavaScript SDK](/sdk/javascript#sessions)
+- [Python SDK](/sdk/python#sessions)

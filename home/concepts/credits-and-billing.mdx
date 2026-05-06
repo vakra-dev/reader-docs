@@ -1,6 +1,6 @@
 ---
 title: "Credits and billing"
-description: "What each Reader operation costs, how the free tier works, and how to check your balance."
+description: "What each Reader operation costs and how to check your balance."
 ---
 
 Reader is metered in **credits**. Every successful scrape consumes credits according to the proxy mode that actually ran; failures and cache hits are free.
@@ -18,16 +18,9 @@ Reader is metered in **credits**. Every successful scrape consumes credits accor
 
 The resolved mode is reported in every response under `metadata.proxyMode`. Your usage history also tracks it; see `/v1/usage/history`.
 
-## Tiers
+## Monthly allowance
 
-| Tier | Monthly credits | Rate limit (req/min) | Concurrent jobs |
-| --- | --- | --- | --- |
-| **Free** | 1,000 | 10 | 2 |
-| **Pro** | 5,000 | 60 | 10 |
-| **Business** | 50,000 | 200 | 50 |
-| **Enterprise** | 500,000 | 1,000 | 200 |
-
-Credits reset at the start of each billing period. Unused credits do not roll over.
+Every account gets **1,000 credits per month**. Credits reset at the start of each billing period. Unused credits do not roll over.
 
 ## Checking your balance
 
@@ -39,10 +32,9 @@ curl https://api.reader.dev/v1/usage/credits -H "x-api-key: $READER_KEY"
 {
   "success": true,
   "data": {
-    "balance": 4955,
-    "limit": 5000,
+    "balance": 955,
+    "limit": 1000,
     "used": 45,
-    "tier": "pro",
     "resetAt": "2026-05-01T00:00:00Z"
   }
 }
@@ -61,9 +53,7 @@ if (credits.balance < 100) {
 
 Reader charges credits **after** a scrape succeeds, not before. The pre-flight check only verifies you have enough to *start* the request; the actual deduction happens once the content is in your response.
 
-For `auto` mode, the pre-flight check is optimistic: it assumes 1 credit per page (the `standard` price). If `auto` escalates and the real cost ends up at 3x, your balance can briefly dip below zero for that request. Your next request gets a `402 insufficient_credits` error until you top up or your credits reset.
-
-This matches how metered billing works everywhere else: you don't want a single escalation to fail your batch mid-run, and you don't want to pre-authorize the maximum cost on every request.
+For `auto` mode, the pre-flight check is optimistic: it assumes 1 credit per page (the `standard` price). If `auto` escalates and the real cost ends up at 3x, your balance can briefly dip below zero for that request. Your next request gets a `402 insufficient_credits` error until your credits reset.
 
 ## Insufficient credits
 
@@ -96,8 +86,20 @@ For `auto` mode, estimate the mix based on what you know:
 
 When in doubt, run a pilot of 50 URLs first and check `metadata.proxyMode` across the results. You'll have a real escalation rate instead of a guess. See [Cost estimation](/home/guides/production/cost-estimation).
 
+## Browser session costs
+
+Browser sessions are billed at **1 credit per minute**, charged in real-time:
+
+- First minute charged on session creation
+- Each additional minute charged via interval timer
+- Session auto-stops if credits run out
+- No reconciliation needed on close - already charged
+
+A 10-minute session costs 10 credits.
+
 ## Next
 
+- [Browser sessions](/home/concepts/browser-sessions): full browser automation
 - [Proxy modes](/home/concepts/proxy-modes): what drives cost
 - [Caching](/home/concepts/caching): free cache hits
 - [Rate limits](/home/concepts/rate-limits): requests per minute, not credits

@@ -1,0 +1,76 @@
+---
+title: "Browser Session"
+description: "API reference for browser() method, BrowserOptions, and BrowserSession"
+---
+
+# browser(options?)
+
+Launch a stealthed browser session and return a CDP WebSocket URL.
+
+```typescript
+const session = await reader.browser(options?): Promise<BrowserSession>
+```
+
+## BrowserOptions
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `proxy` | `ProxyConfig` | - | Proxy to route browser traffic through |
+| `proxyTier` | `ProxyTier` | - | Use a proxy from the configured pool tier |
+| `showChrome` | `boolean` | `false` | Show the browser window |
+| `timeoutMs` | `number` | `300000` | Session lifetime in ms (auto-closes after) |
+| `verbose` | `boolean` | `false` | Enable verbose logging |
+
+## BrowserSession
+
+```typescript
+interface BrowserSession {
+  /** Unique session identifier */
+  sessionId: string;
+
+  /** CDP WebSocket URL for Playwright/Puppeteer */
+  wsEndpoint: string;
+
+  /** ISO 8601 timestamp of session creation */
+  createdAt: string;
+
+  /** Close the session and release all resources */
+  close(): Promise<void>;
+}
+```
+
+## Examples
+
+### Basic
+
+```typescript
+const session = await reader.browser();
+console.log(session.wsEndpoint);
+// ws://127.0.0.1:PORT/devtools/browser/UUID
+
+await session.close();
+```
+
+### With Proxy
+
+```typescript
+const session = await reader.browser({
+  proxy: { url: "http://user:pass@proxy:8080" },
+});
+```
+
+### With Timeout
+
+```typescript
+const session = await reader.browser({
+  timeoutMs: 600_000, // 10 minutes
+});
+```
+
+### Show Browser Window
+
+```typescript
+const session = await reader.browser({
+  showChrome: true,
+});
+```

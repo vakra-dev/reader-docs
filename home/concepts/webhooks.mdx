@@ -38,8 +38,12 @@ You can create up to 10 webhooks per workspace.
 | `job.completed` | A job reaches `completed` state (may include failures in `results`) |
 | `job.failed` | A job reaches `failed` state (fatal, not per-URL failures) |
 | `credit.low` | Workspace balance drops below 10% of the monthly limit |
+| `session.created` | A browser session was created |
+| `session.stopped` | A browser session was stopped (includes billing summary) |
 
 Most callers subscribe to `job.completed` and `job.failed`. Subscribe to `job.page` only when you need streaming-style incremental delivery; it can be very chatty on large batches.
+
+The `session.*` events are useful for monitoring browser session usage and costs.
 
 ## Headers Reader sends
 

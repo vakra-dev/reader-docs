@@ -1,0 +1,57 @@
+---
+title: "Stop Session"
+api: "DELETE /v1/sessions/{id}"
+description: "Stop a browser session and get billing summary"
+---
+
+Stop an active browser session. Returns the billing summary with total duration and credits charged.
+
+## Request
+
+### Headers
+
+| Header | Required | Description |
+|--------|----------|-------------|
+| `x-api-key` | Yes | Your API key |
+
+### Path Parameters
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `id` | `string` | Session ID |
+
+## Response
+
+### 200 OK
+
+```json
+{
+  "success": true,
+  "data": {
+    "sessionId": "ses_a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+    "status": "stopped",
+    "durationMs": 45000,
+    "creditsCharged": 1
+  }
+}
+```
+
+### Fields
+
+| Field | Description |
+|-------|-------------|
+| `sessionId` | Session that was stopped |
+| `status` | Always `"stopped"` |
+| `durationMs` | How long the session was active in milliseconds |
+| `creditsCharged` | Total credits charged for this session |
+
+## Errors
+
+| Code | Status | Description |
+|------|--------|-------------|
+| `session_not_found` | 404 | Session does not exist or belongs to another workspace |
+| `session_expired` | 410 | Session already stopped or expired |
+
+## Webhook
+
+A `session.stopped` webhook event is fired with the billing summary.

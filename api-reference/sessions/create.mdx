@@ -1,0 +1,85 @@
+---
+title: "Create Session"
+api: "POST /v1/sessions"
+description: "Create a browser session with a CDP WebSocket endpoint"
+---
+
+Create a stealthed browser session. Returns a WebSocket URL for Playwright/Puppeteer connection.
+
+## Request
+
+### Headers
+
+| Header | Required | Description |
+|--------|----------|-------------|
+| `x-api-key` | Yes | Your API key |
+| `Content-Type` | Yes | `application/json` |
+
+### Body
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `maxDurationMs` | `number` | `3600000` | Maximum session lifetime in ms (60s - 60min) |
+
+```json
+{
+  "maxDurationMs": 600000
+}
+```
+
+## Response
+
+### 201 Created
+
+```json
+{
+  "success": true,
+  "data": {
+    "sessionId": "ses_a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+    "wsEndpoint": "wss://api.reader.dev/v1/sessions/ses_a1b2.../cdp?token=abc123...",
+    "token": "abc123def456...",
+    "status": "active",
+    "createdAt": "2026-04-30T12:00:00.000Z",
+    "expiresAt": "2026-04-30T13:00:00.000Z"
+  }
+}
+```
+
+### Fields
+
+| Field | Description |
+|-------|-------------|
+| `sessionId` | Unique session identifier |
+| `wsEndpoint` | CDP WebSocket URL - pass to `chromium.connectOverCDP()` |
+| `token` | Auth token embedded in wsEndpoint (for WebSocket proxy) |
+| `status` | Always `"active"` on creation |
+| `createdAt` | ISO 8601 timestamp |
+| `expiresAt` | When the session will auto-close |
+
+## Usage
+
+### Playwright
+
+```typescript
+const session = await client.sessions.create();
+const browser = await chromium.connectOverCDP(session.wsEndpoint);
+```
+
+### Puppeteer
+
+```typescript
+const session = await client.sessions.create();
+const browser = await connect({ browserWSEndpoint: session.wsEndpoint });
+```
+
+## Errors
+
+| Code | Status | Description |
+|------|--------|-------------|
+| `insufficient_credits` | 402 | Not enough credits (sessions cost 1 credit/min) |
+| `rate_limited` | 429 | Too many requests |
+| `upstream_unavailable` | 502 | Browser engine unavailable |
+
+## Credits
+
+Sessions charge **1 credit per minute**, starting immediately on creation. Credits are deducted in real-time. If credits run out, the session is automatically stopped.

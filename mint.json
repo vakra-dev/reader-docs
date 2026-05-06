@@ -73,6 +73,7 @@
       "pages": [
         "home/concepts/read-primitive",
         "home/concepts/scrape-vs-crawl",
+        "home/concepts/browser-sessions",
         "home/concepts/formats-and-extraction",
         "home/concepts/proxy-modes",
         "home/concepts/caching",
@@ -180,6 +181,16 @@
       ]
     },
     {
+      "group": "Sessions",
+      "pages": [
+        "api-reference/sessions/create",
+        "api-reference/sessions/get",
+        "api-reference/sessions/stop",
+        "api-reference/sessions/list",
+        "api-reference/sessions/cdp"
+      ]
+    },
+    {
       "group": "Account",
       "pages": [
         "api-reference/account/credits",
@@ -202,6 +213,7 @@
         "self-hosted/concepts/crawling",
         "self-hosted/concepts/content-extraction",
         "self-hosted/concepts/browser-pool",
+        "self-hosted/concepts/browser-sessions",
         "self-hosted/concepts/engine-waterfall",
         "self-hosted/concepts/proxy-tiers",
         "self-hosted/concepts/error-handling"
@@ -216,6 +228,7 @@
         "self-hosted/guides/proxy-configuration",
         "self-hosted/guides/cli",
         "self-hosted/guides/daemon-mode",
+        "self-hosted/guides/browser-sessions",
         "self-hosted/guides/deployment"
       ]
     },
@@ -229,6 +242,7 @@
         "self-hosted/api-reference/scrape-result",
         "self-hosted/api-reference/crawl-options",
         "self-hosted/api-reference/crawl-result",
+        "self-hosted/api-reference/browser-session",
         "self-hosted/api-reference/errors"
       ]
     }

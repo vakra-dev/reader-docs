@@ -275,9 +275,64 @@ from reader_py import (
 
 All models are Pydantic `BaseModel` subclasses with `snake_case` field names. The SDK internally translates to/from the API's `camelCase`.
 
+## Browser Sessions
+
+Create stealthed browser sessions for Playwright automation:
+
+### Sync Client
+
+```python
+from reader_py import ReaderClient
+from playwright.sync_api import sync_playwright
+
+client = ReaderClient(api_key="rdr_...")
+
+session = client.sessions.create()
+print(session.ws_endpoint)
+
+with sync_playwright() as p:
+    browser = p.chromium.connect_over_cdp(session.ws_endpoint)
+    page = browser.contexts[0].new_page()
+    page.goto("https://example.com")
+    print(page.title())
+    browser.close()
+
+client.sessions.stop(session.session_id)
+```
+
+### Async Client
+
+```python
+from reader_py import AsyncReaderClient
+from playwright.async_api import async_playwright
+
+client = AsyncReaderClient(api_key="rdr_...")
+
+session = await client.sessions.create()
+
+async with async_playwright() as p:
+    browser = await p.chromium.connect_over_cdp(session.ws_endpoint)
+    page = await (await browser.new_context()).new_page()
+    await page.goto("https://example.com")
+    print(await page.title())
+    await browser.close()
+
+await client.sessions.stop(session.session_id)
+```
+
+### Sessions API
+
+| Method | Description |
+|--------|-------------|
+| `client.sessions.create(**kwargs)` | Create a session |
+| `client.sessions.get(session_id)` | Get session status |
+| `client.sessions.stop(session_id)` | Stop a session |
+| `client.sessions.list()` | List active sessions |
+
 ## Next
 
 - [JavaScript SDK](/sdk/javascript): same features, TypeScript API
+- [Browser Sessions](/home/concepts/browser-sessions): concept overview
 - [Errors](/home/concepts/errors): full error code catalog
 - [Proxy modes](/home/concepts/proxy-modes): when to override the default
 - [API reference](/api-reference/read): the raw HTTP contract

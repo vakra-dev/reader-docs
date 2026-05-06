@@ -1,16 +1,17 @@
 ---
 title: "Introduction"
-description: "Reader turns any web page into clean, LLM-ready content."
+description: "The web infrastructure platform for AI. Scrape, crawl, and automate the web from a single API."
 ---
 
-Reader is a hosted API that turns any web page into clean, structured content - markdown, HTML, metadata, and extracted fields - ready to feed to LLMs, agents, and pipelines.
+Reader is the web infrastructure platform for AI. Scrape, crawl, and automate the web from a single API. Get back clean markdown, HTML, and metadata, or spin up cloud browser sessions with full Playwright/Puppeteer control.
 
-One endpoint. One `x-api-key` header. You point it at a URL, we handle the rest:
+One API key. Three primitives. You point it at a URL, we handle the rest:
 
 - **Rendering** dynamic, JavaScript-heavy sites so you get the page the user sees
 - **Bypassing** bot walls automatically. Pick `standard`, `stealth`, or let `auto` decide
 - **Extracting** main content and stripping navigation, ads, and boilerplate
 - **Converting** to clean markdown optimized for language models
+- **Automating** with cloud browser sessions for login flows, multi-step navigation, and interactive automation
 - **Caching** successful scrapes for 24 hours, so repeat requests are free
 
 ## What you can build
@@ -50,25 +51,25 @@ One endpoint. One `x-api-key` header. You point it at a URL, we handle the rest:
 
 ## How Reader works
 
-Everything flows through a single endpoint: `POST /v1/read`.
+Three primitives, each with its own endpoint:
 
-The shape of your request determines what Reader does:
-
-| Request | Mode | Response |
+| Endpoint | Primitive | What it does |
 |---|---|---|
-| Single `url` | **Scrape** | Synchronous - results returned immediately |
-| Array of `urls` | **Batch** | Asynchronous - returns a `jobId` to poll or stream |
-| `url` with `maxDepth` / `maxPages` | **Crawl** | Asynchronous - discovers links and scrapes each page |
+| `POST /v1/read` with single `url` | **Read** | Scrape a page. Returns results synchronously |
+| `POST /v1/read` with `urls` array | **Batch** | Scrape many pages. Returns a `jobId` to poll or stream |
+| `POST /v1/read` with `maxDepth` / `maxPages` | **Crawl** | Discover links and scrape each page asynchronously |
+| `POST /v1/sessions` | **Browse** | Spin up a cloud browser. Connect Playwright/Puppeteer via CDP |
 
-You don't pick the mode. Reader infers it from your input. See [The read primitive](/home/concepts/read-primitive) for the full mental model.
+See [The read primitive](/home/concepts/read-primitive) for the scrape/batch/crawl mental model, or [Browser sessions](/home/concepts/browser-sessions) for interactive automation.
 
 ## Why developers pick Reader
 
-- **One primitive, infinite shapes.** No separate endpoints for scrape, batch, crawl. One `read` call handles all three.
+- **Three primitives, one platform.** Read, crawl, and browse through one API key, one credit pool. No separate billing tracks or hidden multipliers.
+- **Browser automation included.** Full Playwright and Puppeteer compatibility via CDP. Connect your existing scripts to cloud browsers with anti-bot stealth active.
 - **Handles the modern web.** Dynamic pages render correctly, bot walls get bypassed automatically in `auto` mode, and you never touch the underlying infrastructure.
 - **Built for LLMs.** Output is clean markdown by default, with optional HTML and metadata. Main content extraction removes boilerplate so your tokens aren't wasted.
 - **Free tier is actually free.** 1,000 credits a month, no card required. Enough to build and ship a real prototype.
-- **Self-hostable.** The underlying engine is open source. Host it yourself if you need to. [Learn more →](/self-hosted)
+- **Self-hostable.** The underlying engine is open source and Apache 2.0 licensed. Host it yourself if you need to. [Learn more →](/self-hosted)
 
 ## Where to go next
 

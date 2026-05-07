@@ -22,9 +22,9 @@ Use batch mode to fetch many URLs in one call:
 ```ts
 import { ReaderClient } from "@vakra-dev/reader-js";
 
-const client = new ReaderClient({ apiKey: process.env.READER_KEY! });
+const reader = new ReaderClient({ apiKey: process.env.READER_KEY! });
 
-const result = await client.read({
+const result = await reader.read({
   urls: loadCorpusUrls(), // sitemap, RSS, database, etc.
 });
 

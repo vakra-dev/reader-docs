@@ -61,7 +61,7 @@ Fetch `GET /v1/jobs/{id}` every few seconds until `status` is terminal. Simplest
 
 ```ts
 while (true) {
-  const { job } = await client.getJob(jobId);
+  const { job } = await reader.getJob(jobId);
   if (["completed", "failed", "cancelled"].includes(job.status)) break;
   await sleep(2000);
 }

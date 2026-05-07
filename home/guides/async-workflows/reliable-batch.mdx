@@ -85,7 +85,7 @@ app.post("/hooks/reader", raw, async (req, res) => {
 ```ts
 async function hydrateResults(jobId: string) {
   // Paginate through all results: don't assume the first page is all of them
-  const allResults = await client.getAllJobResults(jobId);
+  const allResults = await reader.getAllJobResults(jobId);
 
   await db.$transaction(async (tx) => {
     await tx.scrapeResults.createMany({
@@ -122,7 +122,7 @@ setInterval(async () => {
   });
 
   for (const batch of stuck) {
-    const { job } = await client.getJob(batch.readerJobId, { limit: 1 });
+    const { job } = await reader.getJob(batch.readerJobId, { limit: 1 });
     if (["completed", "failed"].includes(job.status)) {
       await hydrateResults(batch.readerJobId);
     }
@@ -138,7 +138,7 @@ When a batch completes with some failed URLs, you have two options:
 - **Retry the failed subset** with `POST /v1/jobs/{id}/retry`
 
 ```ts
-const retrying = await client.retryJob(jobId);
+const retrying = await reader.retryJob(jobId);
 console.log(`Retrying ${retrying.retrying} failed URLs`);
 ```
 

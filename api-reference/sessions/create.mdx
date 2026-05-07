@@ -61,14 +61,14 @@ Create a stealthed browser session. Returns a WebSocket URL for Playwright/Puppe
 ### Playwright
 
 ```typescript
-const session = await client.sessions.create();
+const session = await reader.sessions.create();
 const browser = await chromium.connectOverCDP(session.wsEndpoint);
 ```
 
 ### Puppeteer
 
 ```typescript
-const session = await client.sessions.create();
+const session = await reader.sessions.create();
 const browser = await connect({ browserWSEndpoint: session.wsEndpoint });
 ```
 

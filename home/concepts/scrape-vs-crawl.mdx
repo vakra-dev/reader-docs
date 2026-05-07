@@ -84,9 +84,9 @@ A rule of thumb:
 A crawl result and a batch result are the same thing as far as your code is concerned: a job with a `results` array where each entry is one page. You can write one handler and point it at either.
 
 ```ts
-const result = await client.read({ urls: [...] });        // batch
+const result = await reader.read({ urls: [...] });        // batch
 // or
-const result = await client.read({ url, maxPages: 100 }); // crawl
+const result = await reader.read({ url, maxPages: 100 }); // crawl
 
 if (result.kind === "job") {
   for (const page of result.data.results) {

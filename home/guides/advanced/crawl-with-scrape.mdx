@@ -8,7 +8,7 @@ When you crawl with Reader, every discovered page is automatically scraped too; 
 ## What you get
 
 ```ts
-const result = await client.read({
+const result = await reader.read({
   url: "https://docs.example.com",
   maxDepth: 3,
   maxPages: 100,
@@ -30,7 +30,7 @@ Each entry in `results[]` has the same shape as a sync scrape result: `url`, `ma
 The same extraction knobs work on crawl jobs:
 
 ```ts
-await client.read({
+await reader.read({
   url: "https://docs.example.com",
   maxDepth: 3,
   maxPages: 100,
@@ -51,7 +51,7 @@ Crawl bills 1 credit per page flat, regardless of proxy mode. A 100-page crawl c
 A crawl + scrape result is a ready-made input for an LLM pipeline, a search index, or a static backup:
 
 ```ts
-const crawled = await client.read({
+const crawled = await reader.read({
   url: "https://blog.example.com",
   maxPages: 200,
 });

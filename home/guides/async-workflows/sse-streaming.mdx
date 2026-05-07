@@ -8,7 +8,7 @@ Server-Sent Events (SSE) let you watch a job make progress without repeatedly po
 ## The per-job stream
 
 ```ts
-for await (const event of client.stream(jobId)) {
+for await (const event of reader.stream(jobId)) {
   switch (event.type) {
     case "progress":
       console.log(`${event.completed}/${event.total}`);

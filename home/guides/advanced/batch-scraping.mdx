@@ -8,7 +8,7 @@ When you have a list of URLs (from a sitemap, an RSS feed, a search result, or y
 ## The basic request
 
 ```ts
-const result = await client.read({
+const result = await reader.read({
   urls: [
     "https://example.com/article/1",
     "https://example.com/article/2",
@@ -36,7 +36,7 @@ A loop of sync scrapes eats your rate limit, your connection pool, and your pati
 ```ts
 // One request per URL: don't do this
 for (const url of urls) {
-  await client.read({ url });
+  await reader.read({ url });
 }
 ```
 
@@ -47,7 +47,7 @@ The batch version is **one** API call. Reader handles parallelism internally and
 By default Reader picks a sensible parallelism level for your batch. For very large batches or target sites you want to be gentle with, set `batchConcurrency` explicitly:
 
 ```ts
-await client.read({
+await reader.read({
   urls: manyUrls,
   batchConcurrency: 5, // Reader runs up to 5 scrapes in parallel
 });
@@ -67,7 +67,7 @@ console.log(`${succeeded.length} succeeded, ${failed.length} failed`);
 
 // Retry just the failed subset if needed
 if (failed.length > 0) {
-  await client.retryJob(result.data.id);
+  await reader.retryJob(result.data.id);
   // Reader re-queues the failed URLs and you get a fresh completion
 }
 ```
@@ -86,7 +86,7 @@ const urls = Array.from(sitemapXml.matchAll(/<loc>([^<]+)<\/loc>/g)).map(
 // Submit in chunks of 1,000 (the max per request)
 for (let i = 0; i < urls.length; i += 1000) {
   const chunk = urls.slice(i, i + 1000);
-  const result = await client.read({
+  const result = await reader.read({
     urls: chunk,
     webhook: {
       url: "https://your-app.example.com/hooks/reader",

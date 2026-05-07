@@ -13,15 +13,15 @@ Using the `cli-progress` library:
 import cliProgress from "cli-progress";
 import { ReaderClient } from "@vakra-dev/reader-js";
 
-const client = new ReaderClient({ apiKey: process.env.READER_KEY! });
+const reader = new ReaderClient({ apiKey: process.env.READER_KEY! });
 const bar = new cliProgress.SingleBar(
   { format: "Scraping |{bar}| {percentage}% | {value}/{total} | {url}" },
   cliProgress.Presets.shades_classic,
 );
 
 // Start the job
-const result = await client.read({ urls: loadUrls() });
-// client.read polls internally, but for a progress UI we want explicit events.
+const result = await reader.read({ urls: loadUrls() });
+// reader.read polls internally, but for a progress UI we want explicit events.
 
 // Cleaner: start the job, get the ID, then stream.
 // (Using the underlying /v1/read directly for illustration.)
@@ -38,7 +38,7 @@ const { data: job } = await res.json();
 bar.start(job.total, 0);
 let lastUrl = "";
 
-for await (const event of client.stream(job.id)) {
+for await (const event of reader.stream(job.id)) {
   if (event.type === "page") {
     lastUrl = event.data.url;
     bar.increment({ url: lastUrl });

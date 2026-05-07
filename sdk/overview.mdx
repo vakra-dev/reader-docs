@@ -18,9 +18,9 @@ Reader provides first-party SDKs that wrap `POST /v1/read`, handle async job pol
 ```typescript JavaScript
 import { ReaderClient } from "@vakra-dev/reader-js";
 
-const client = new ReaderClient({ apiKey: process.env.READER_KEY! });
+const reader = new ReaderClient({ apiKey: process.env.READER_KEY! });
 
-const result = await client.read({ url: "https://example.com" });
+const result = await reader.read({ url: "https://example.com" });
 if (result.kind === "scrape") {
   console.log(result.data.markdown);
 }
@@ -29,9 +29,9 @@ if (result.kind === "scrape") {
 ```python Python
 from reader_py import ReaderClient
 
-client = ReaderClient(api_key=os.environ["READER_KEY"])
+reader = ReaderClient(api_key=os.environ["READER_KEY"])
 
-result = client.read(url="https://example.com")
+result = reader.read(url="https://example.com")
 if result.kind == "scrape":
     print(result.data.markdown)
 ```
@@ -46,7 +46,7 @@ Both SDKs return a **discriminated result**: `kind: "scrape"` for single-URL req
 | Sync scrape | ✓ | ✓ |
 | Batch & crawl auto-poll | ✓ | ✓ |
 | Async client | (native fetch is async) | `AsyncReaderClient` |
-| SSE streaming | `client.stream(jobId)` | `client.stream(jobId)` |
+| SSE streaming | `reader.stream(jobId)` | `reader.stream(jobId)` |
 | Typed errors (11 codes) | ✓ | ✓ |
 | Auto-pagination of job results | ✓ | ✓ |
 | Retry with exponential backoff | ✓ | ✓ |
@@ -61,7 +61,7 @@ Errors from the API are parsed into specific exception subclasses so you can bra
 import { InsufficientCreditsError, RateLimitedError } from "@vakra-dev/reader-js";
 
 try {
-  await client.read({ url });
+  await reader.read({ url });
 } catch (err) {
   if (err instanceof InsufficientCreditsError) {
     console.error(`Need ${err.required}, have ${err.available}`);
@@ -77,7 +77,7 @@ try {
 from reader_py import InsufficientCreditsError, RateLimitedError
 
 try:
-    client.read(url=url)
+    reader.read(url=url)
 except InsufficientCreditsError as err:
     print(f"Need {err.required}, have {err.available}")
 except RateLimitedError as err:

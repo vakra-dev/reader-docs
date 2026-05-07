@@ -22,7 +22,7 @@ The WebSocket proxy authenticates via the `token` query parameter (not the API k
 ## Playwright
 
 ```typescript
-const session = await client.sessions.create();
+const session = await reader.sessions.create();
 const browser = await chromium.connectOverCDP(session.wsEndpoint);
 const context = await browser.newContext();
 const page = await context.newPage();
@@ -39,7 +39,7 @@ const cookies = await context.cookies();
 ## Puppeteer
 
 ```typescript
-const session = await client.sessions.create();
+const session = await reader.sessions.create();
 const browser = await connect({
   browserWSEndpoint: session.wsEndpoint,
   defaultViewport: null,

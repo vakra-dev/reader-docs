@@ -29,7 +29,7 @@ async function streamUsageHistory(since: Date) {
   let skip = 0;
   const limit = 100;
   while (true) {
-    const envelope = await client.request(
+    const envelope = await reader.request(
       "GET",
       `/v1/usage/history?skip=${skip}&limit=${limit}`,
     );
@@ -48,7 +48,7 @@ async function streamUsageHistory(since: Date) {
 A one-call poll:
 
 ```ts
-const { balance, limit, used, tier, resetAt } = await client.getCredits();
+const { balance, limit, used, tier, resetAt } = await reader.getCredits();
 metrics.gauge("reader.credits.balance", balance);
 metrics.gauge("reader.credits.used", used);
 ```
@@ -57,7 +57,7 @@ Scrape this on an interval (every minute or two is plenty) and graph it.
 
 ## Instrumenting client calls
 
-Wrap your `client.read` calls in a metrics helper:
+Wrap your `reader.read` calls in a metrics helper:
 
 ```ts
 async function trackedRead(params) {
@@ -66,7 +66,7 @@ async function trackedRead(params) {
   let code = null;
 
   try {
-    const result = await client.read(params);
+    const result = await reader.read(params);
     return result;
   } catch (err) {
     status = "error";

@@ -65,7 +65,7 @@ When in doubt, assume 2x (effective cost 1.5 credits per page) for mixed workloa
 For any batch above a few hundred URLs, run a **pilot** on a representative subset of 50–100 URLs, then measure the real escalation rate:
 
 ```ts
-const pilot = await client.read({ urls: sampleUrls });
+const pilot = await reader.read({ urls: sampleUrls });
 let escalated = 0;
 let total = 0;
 
@@ -104,7 +104,7 @@ Crawls are single-credit-per-page because they run in a mode optimized for link 
 After the run, `/v1/usage/history` shows per-request cost broken down by `proxyMode`. The sum of the `credits` column is your actual spend.
 
 ```ts
-const logs = await client.request("GET", "/v1/usage/history?limit=100");
+const logs = await reader.request("GET", "/v1/usage/history?limit=100");
 const total = logs.data.reduce((sum, entry) => sum + entry.credits, 0);
 console.log(`Last 100 requests: ${total} credits`);
 ```

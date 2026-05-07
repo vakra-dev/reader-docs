@@ -8,7 +8,7 @@ Use crawl mode when you want to index an entire site but don't have a URL list t
 ## The basic request
 
 ```ts
-const result = await client.read({
+const result = await reader.read({
   url: "https://docs.example.com",
   maxDepth: 3,
   maxPages: 200,
@@ -56,7 +56,7 @@ const res = await fetch("https://api.reader.dev/v1/read", {
 const { data: job } = await res.json();
 
 // Stream progress
-for await (const event of client.stream(job.id)) {
+for await (const event of reader.stream(job.id)) {
   if (event.type === "page") {
     console.log("discovered:", event.data.url);
   }

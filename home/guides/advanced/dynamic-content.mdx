@@ -10,7 +10,7 @@ Modern single-page apps don't render content until JavaScript runs and data arri
 Tell Reader to wait for a specific element to appear before capturing:
 
 ```ts
-const result = await client.read({
+const result = await reader.read({
   url: "https://shop.example.com/search?q=phone",
   waitForSelector: ".product-card",
 });
@@ -51,7 +51,7 @@ Some pages are hard for reasons selectors can't fix:
 Sites that hydrate dynamically *and* detect bots are harder still. `waitForSelector` gets you past the hydration; `proxyMode: "stealth"` (or `auto` with escalation) gets you past the bot detection. They work independently, and you might need both:
 
 ```ts
-await client.read({
+await reader.read({
   url: "https://shop.example.com/item/42",
   waitForSelector: ".product-price",
   proxyMode: "auto", // lets Reader escalate if the site blocks standard

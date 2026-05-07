@@ -37,7 +37,7 @@ Only sync single-URL scrapes cache. `urls: [...]` is a batch job and each URL is
 
 ```ts
 for (const url of urls) {
-  const result = await client.read({ url });
+  const result = await reader.read({ url });
   // each gets cache-aware handling
 }
 ```
@@ -79,7 +79,7 @@ On a cache hit, `cached` is `true` and `scrapedAt` is the original fetch time. I
 If you know the content changed and need to bypass:
 
 ```ts
-await client.read({ url, cache: false });
+await reader.read({ url, cache: false });
 ```
 
 Reader fetches fresh AND writes the new result to cache, so the next non-bypass request hits the new entry.

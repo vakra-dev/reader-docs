@@ -10,7 +10,7 @@ CSS selectors give you scalpel-level control over what ends up in your markdown.
 Pass a list of CSS selectors, and Reader keeps only content matching them. Everything else is dropped.
 
 ```ts
-await client.read({
+await reader.read({
   url: "https://example.com/product/42",
   includeTags: [".product-title", ".product-description", ".product-specs"],
 });
@@ -23,7 +23,7 @@ Useful when a page has a predictable layout and you want only the relevant fragm
 The inverse. Keep everything, but drop what matches these selectors.
 
 ```ts
-await client.read({
+await reader.read({
   url: "https://example.com/blog/post",
   excludeTags: [".newsletter-signup", "#related-posts", "figure.ad"],
 });
@@ -36,7 +36,7 @@ Useful when `onlyMainContent` leaves in something you don't want, or when you've
 Both can be passed at once. Reader runs `includeTags` first (narrows to matching content), then `excludeTags` on what remains.
 
 ```ts
-await client.read({
+await reader.read({
   url: "https://docs.example.com/api/reference",
   includeTags: ["main"],
   excludeTags: [".feedback-widget", ".edit-on-github"],

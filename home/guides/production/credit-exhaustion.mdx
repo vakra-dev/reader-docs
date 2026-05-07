@@ -11,7 +11,7 @@ Poll your credit balance before starting work that will consume a lot:
 
 ```ts
 async function ensureCredits(needed: number) {
-  const credits = await client.getCredits();
+  const credits = await reader.getCredits();
   if (credits.balance < needed) {
     throw new Error(
       `Insufficient credits: need ${needed}, have ${credits.balance}. ` +
@@ -21,7 +21,7 @@ async function ensureCredits(needed: number) {
 }
 
 await ensureCredits(estimateBatchCost(urls));
-const result = await client.read({ urls });
+const result = await reader.read({ urls });
 ```
 
 This isn't foolproof (other requests on the same workspace can consume credits between your check and your actual `/v1/read` call), but for big batches it catches the obvious "you're nowhere near enough" case.
@@ -34,7 +34,7 @@ When `/v1/read` returns `insufficient_credits`:
 import { InsufficientCreditsError } from "@vakra-dev/reader-js";
 
 try {
-  await client.read({ url });
+  await reader.read({ url });
 } catch (err) {
   if (err instanceof InsufficientCreditsError) {
     console.error(`Need ${err.required}, have ${err.available}`);
@@ -61,7 +61,7 @@ This is intentional (it mirrors Stripe's metered billing), but it means your err
 Subscribe to `credit.low` to get notified before you run out:
 
 ```ts
-await client.request("POST", "/v1/webhooks", {
+await reader.request("POST", "/v1/webhooks", {
   url: "https://your-app.example.com/hooks/reader",
   name: "Credit alerts",
   events: ["credit.low"],
@@ -98,7 +98,7 @@ async function scrapeWithBudget(url: string) {
     throw new Error("Daily budget exhausted");
   }
 
-  const result = await client.read({ url });
+  const result = await reader.read({ url });
   // The actual cost is 1 or 3 depending on the resolved mode
   const cost = result.data.metadata?.proxyMode === "stealth" ? 3 : 1;
   dailySpend += cost;

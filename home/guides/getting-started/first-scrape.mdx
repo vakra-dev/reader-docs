@@ -27,8 +27,8 @@ Or with the JS SDK:
 ```ts
 import { ReaderClient } from "@vakra-dev/reader-js";
 
-const client = new ReaderClient({ apiKey: process.env.READER_KEY! });
-const result = await client.read({ url: "https://example.com" });
+const reader = new ReaderClient({ apiKey: process.env.READER_KEY! });
+const result = await reader.read({ url: "https://example.com" });
 
 if (result.kind === "scrape") {
   console.log(result.data.markdown);
@@ -40,8 +40,8 @@ Or Python:
 ```python
 from reader_py import ReaderClient
 
-client = ReaderClient(api_key=os.environ["READER_KEY"])
-result = client.read(url="https://example.com")
+reader = ReaderClient(api_key=os.environ["READER_KEY"])
+result = reader.read(url="https://example.com")
 
 if result.kind == "scrape":
     print(result.data.markdown)

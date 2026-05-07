@@ -8,7 +8,7 @@ A job that stays in `processing` for longer than you expected is usually one of 
 ## Step 1: check the progress
 
 ```ts
-const { job } = await client.getJob(jobId, { limit: 1 });
+const { job } = await reader.getJob(jobId, { limit: 1 });
 console.log(`${job.status}: ${job.completed}/${job.total}`);
 console.log(`started: ${job.startedAt}, elapsed: ${elapsedSince(job.startedAt)}`);
 ```
@@ -36,10 +36,10 @@ Open a few of the URLs in your browser. If they're slow or failing in a browser,
 If you're sure the job is stuck and there's nothing useful left to collect:
 
 ```ts
-await client.cancelJob(jobId);
+await reader.cancelJob(jobId);
 
 // Retry with adjustments
-await client.read({
+await reader.read({
   urls: failedUrls,
   timeoutMs: 60_000,
   proxyMode: "stealth",
@@ -60,7 +60,7 @@ Cancelling preserves the results already collected; you can read them from the c
 In client code, always put a hard timeout on waiting for a job:
 
 ```ts
-const job = await client.waitForJob(jobId, {
+const job = await reader.waitForJob(jobId, {
   timeout: 15 * 60_000, // 15 minutes
 });
 ```

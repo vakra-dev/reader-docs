@@ -43,7 +43,7 @@ curl https://api.reader.dev/v1/usage/credits -H "x-api-key: $READER_KEY"
 Check programmatically from the SDK:
 
 ```ts
-const credits = await client.getCredits();
+const credits = await reader.getCredits();
 if (credits.balance < 100) {
   console.warn("Low credits, resets at", credits.resetAt);
 }

@@ -40,7 +40,7 @@ Reader thinks the scrape succeeded, but what you got isn't the real page.
 If you suspect the auto-escalation isn't kicking in, force stealth:
 
 ```ts
-await client.read({
+await reader.read({
   url: "https://hostile-site.example.com/page",
   proxyMode: "stealth",
 });
@@ -69,7 +69,7 @@ For these, your options are:
 If a page loads a shell and then hydrates content client-side, even stealth won't give you the real markdown unless the page has finished hydrating. Combine stealth with `waitForSelector`:
 
 ```ts
-await client.read({
+await reader.read({
   url: "https://shop.example.com/item/42",
   proxyMode: "stealth",
   waitForSelector: ".product-price",
@@ -83,7 +83,7 @@ Reader waits for `.product-price` to appear before capturing, ensuring you see t
 Set a minimum content length and flag anything below it:
 
 ```ts
-const result = await client.read({ url });
+const result = await reader.read({ url });
 if (result.kind === "scrape") {
   const markdown = result.data.markdown ?? "";
   if (markdown.length < 500) {

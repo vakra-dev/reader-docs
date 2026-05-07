@@ -17,7 +17,7 @@ Some pages won't load for any non-human request no matter what you do. Others wo
 For these, set `proxyMode: "stealth"` explicitly (or let `auto` handle it) and you'll usually get clean content:
 
 ```ts
-await client.read({
+await reader.read({
   url: "https://shop.example.com/item/42",
   proxyMode: "stealth", // 3 credits/page, bypasses bot walls
 });
@@ -49,7 +49,7 @@ If your scrapes are failing with `upstream_unavailable`, `scrape_timeout`, or ar
 When you know ahead of time a target is hostile (Amazon, LinkedIn, booking.com, ticketing sites, some news aggregators), skip the optimistic `auto` attempt and go straight to stealth:
 
 ```ts
-await client.read({
+await reader.read({
   url: "https://www.amazon.com/dp/B08N5WRWNW",
   proxyMode: "stealth",
 });

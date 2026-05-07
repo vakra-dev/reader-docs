@@ -19,9 +19,9 @@ Current version: **0.2.0**. Requires Python 3.9+.
 import os
 from reader_py import ReaderClient
 
-client = ReaderClient(api_key=os.environ["READER_KEY"])
+reader = ReaderClient(api_key=os.environ["READER_KEY"])
 
-result = client.read(url="https://example.com")
+result = reader.read(url="https://example.com")
 if result.kind == "scrape":
     print(result.data.markdown)
     print(f"scraped in {result.data.metadata.duration}ms")
@@ -34,8 +34,8 @@ import asyncio
 from reader_py import AsyncReaderClient
 
 async def main():
-    async with AsyncReaderClient(api_key=os.environ["READER_KEY"]) as client:
-        result = await client.read(url="https://example.com")
+    async with AsyncReaderClient(api_key=os.environ["READER_KEY"]) as reader:
+        result = await reader.read(url="https://example.com")
         if result.kind == "scrape":
             print(result.data.markdown)
 
@@ -47,7 +47,7 @@ Every method on `ReaderClient` has an awaitable equivalent on `AsyncReaderClient
 ## Configuration
 
 ```python
-client = ReaderClient(
+reader = ReaderClient(
     api_key="rdr_your_key",              # required
     base_url="https://api.reader.dev",   # optional, override for self-hosted
     timeout=60,                          # per-request timeout in seconds (default 60)
@@ -61,7 +61,7 @@ client = ReaderClient(
 Single-URL requests return immediately with `ReadResult(kind="scrape", data=ScrapeResult)`.
 
 ```python
-result = client.read(
+result = reader.read(
     url="https://example.com",
     formats=["markdown"],
     only_main_content=True,
@@ -83,7 +83,7 @@ if result.kind == "scrape":
 Passing `urls` creates an async job. The SDK auto-polls until the job terminates and returns `ReadResult(kind="job", data=Job)` with all results collected across pagination.
 
 ```python
-result = client.read(
+result = reader.read(
     urls=[
         "https://example.com/page-1",
         "https://example.com/page-2",
@@ -105,7 +105,7 @@ if result.kind == "job":
 Same shape as batch, but with `max_depth` or `max_pages`:
 
 ```python
-result = client.read(
+result = reader.read(
     url="https://docs.example.com",
     max_depth=3,
     max_pages=100,
@@ -118,13 +118,13 @@ Control how aggressively Reader bypasses bot walls with `proxy_mode`:
 
 ```python
 # Default: auto. Starts standard, escalates to stealth on block
-client.read(url=url)
+reader.read(url=url)
 
 # Explicit: force the cheaper tier (error if blocked)
-client.read(url=url, proxy_mode="standard")
+reader.read(url=url, proxy_mode="standard")
 
 # Explicit: force the bypass tier (3x credits but works on hostile sites)
-client.read(url=url, proxy_mode="stealth")
+reader.read(url=url, proxy_mode="stealth")
 ```
 
 See [Proxy modes](/home/concepts/proxy-modes) for the full picture.
@@ -135,28 +135,28 @@ The SDK's `read()` method auto-polls batches and crawls, so most callers never n
 
 ```python
 # Fetch a single page of a job's results
-job, has_more = client.get_job(job_id, skip=0, limit=20)
+job, has_more = reader.get_job(job_id, skip=0, limit=20)
 
 # Collect every page automatically
-all_pages = client.get_all_job_results(job_id)
+all_pages = reader.get_all_job_results(job_id)
 
 # Poll a job by ID until it terminates (collects all results on completion)
-job = client.wait_for_job(job_id, poll_interval=2, timeout=300)
+job = reader.wait_for_job(job_id, poll_interval=2, timeout=300)
 
 # Cancel a queued or processing job
-client.cancel_job(job_id)
+reader.cancel_job(job_id)
 
 # Retry failed URLs in a completed job
-retry_info = client.retry_job(job_id)
+retry_info = reader.retry_job(job_id)
 print(f"retrying {retry_info['retrying']} failed URLs")
 ```
 
 ## Streaming
 
-For real-time progress updates on a job, use `client.stream(job_id)`, a generator that yields `StreamEvent` instances as the job makes progress.
+For real-time progress updates on a job, use `reader.stream(job_id)`, a generator that yields `StreamEvent` instances as the job makes progress.
 
 ```python
-for event in client.stream(job_id):
+for event in reader.stream(job_id):
     if event.type == "progress":
         print(f"{event.completed} / {event.total}")
     elif event.type == "page":
@@ -173,7 +173,7 @@ for event in client.stream(job_id):
 ## Credits
 
 ```python
-credits = client.get_credits()
+credits = reader.get_credits()
 print(f"{credits.balance} / {credits.limit}, tier: {credits.tier}")
 print(f"resets at: {credits.reset_at}")
 
@@ -203,7 +203,7 @@ from reader_py import (
 )
 
 try:
-    result = client.read(url=url)
+    result = reader.read(url=url)
 except InsufficientCreditsError as err:
     print(f"Need {err.required} credits, have {err.available}")
     print(f"Resets at {err.reset_at}")
@@ -243,7 +243,7 @@ The SDK retries these codes automatically with exponential backoff before raisin
 Every `read()` call can include an inline webhook config that fires on job lifecycle events, useful for fire-and-forget batches.
 
 ```python
-client.read(
+reader.read(
     urls=many_urls,
     webhook={
         "url": "https://your-app.example.com/hooks/reader",
@@ -285,9 +285,9 @@ Create stealthed browser sessions for Playwright automation:
 from reader_py import ReaderClient
 from playwright.sync_api import sync_playwright
 
-client = ReaderClient(api_key="rdr_...")
+reader = ReaderClient(api_key="rdr_...")
 
-session = client.sessions.create()
+session = reader.sessions.create()
 print(session.ws_endpoint)
 
 with sync_playwright() as p:
@@ -297,7 +297,7 @@ with sync_playwright() as p:
     print(page.title())
     browser.close()
 
-client.sessions.stop(session.session_id)
+reader.sessions.stop(session.session_id)
 ```
 
 ### Async Client
@@ -306,9 +306,9 @@ client.sessions.stop(session.session_id)
 from reader_py import AsyncReaderClient
 from playwright.async_api import async_playwright
 
-client = AsyncReaderClient(api_key="rdr_...")
+reader = AsyncReaderClient(api_key="rdr_...")
 
-session = await client.sessions.create()
+session = await reader.sessions.create()
 
 async with async_playwright() as p:
     browser = await p.chromium.connect_over_cdp(session.ws_endpoint)
@@ -317,17 +317,17 @@ async with async_playwright() as p:
     print(await page.title())
     await browser.close()
 
-await client.sessions.stop(session.session_id)
+await reader.sessions.stop(session.session_id)
 ```
 
 ### Sessions API
 
 | Method | Description |
 |--------|-------------|
-| `client.sessions.create(**kwargs)` | Create a session |
-| `client.sessions.get(session_id)` | Get session status |
-| `client.sessions.stop(session_id)` | Stop a session |
-| `client.sessions.list()` | List active sessions |
+| `reader.sessions.create(**kwargs)` | Create a session |
+| `reader.sessions.get(session_id)` | Get session status |
+| `reader.sessions.stop(session_id)` | Stop a session |
+| `reader.sessions.list()` | List active sessions |
 
 ## Next
 

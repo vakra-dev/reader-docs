@@ -27,7 +27,7 @@ The key insight: **your job creator and your job consumer can be different servi
 Do this once, ahead of time. Webhooks persist until you delete them.
 
 ```ts
-await client.request("POST", "/v1/webhooks", {
+await reader.request("POST", "/v1/webhooks", {
   url: "https://your-app.example.com/hooks/reader",
   name: "Production batch completion",
   events: ["job.completed", "job.failed"],
@@ -38,7 +38,7 @@ await client.request("POST", "/v1/webhooks", {
 ## Kicking off a job
 
 ```ts
-const { data: job } = await client.request("POST", "/v1/read", {
+const { data: job } = await reader.request("POST", "/v1/read", {
   urls: loadUrlsFromDatabase(),
 });
 await saveJobToTrackingTable(job.id, "pending");

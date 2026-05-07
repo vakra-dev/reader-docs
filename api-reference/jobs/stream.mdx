@@ -14,6 +14,6 @@ Stream events for a single job over a long-lived HTTP connection. Events fire as
 | `error` | `{ url, error }`: a single page failed |
 | `done` | `{ status, completed, total }`: final event, stream closes |
 
-The SDK clients wrap this as `client.stream(jobId)` returning an async iterator. See [SSE streaming](/home/guides/async-workflows/sse-streaming).
+The SDK clients wrap this as `reader.stream(jobId)` returning an async iterator. See [SSE streaming](/home/guides/async-workflows/sse-streaming).
 
 For a workspace-wide stream of every job's events, use [`GET /v1/events`](/api-reference/jobs/events) instead.

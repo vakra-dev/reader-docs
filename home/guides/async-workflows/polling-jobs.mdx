@@ -10,14 +10,14 @@ Polling is the hello-world of async jobs. Fire a request, get a job ID, and then
 ```ts
 import { ReaderClient } from "@vakra-dev/reader-js";
 
-const client = new ReaderClient({ apiKey: process.env.READER_KEY! });
+const reader = new ReaderClient({ apiKey: process.env.READER_KEY! });
 
-const result = await client.read({
+const result = await reader.read({
   urls: ["https://example.com/a", "https://example.com/b"],
 });
 
 if (result.kind === "job") {
-  // `client.read` auto-polls via waitForJob and returns the completed job.
+  // `reader.read` auto-polls via waitForJob and returns the completed job.
   // All pages are collected.
   for (const page of result.data.results) {
     console.log(page.url, page.markdown?.length);
@@ -25,14 +25,14 @@ if (result.kind === "job") {
 }
 ```
 
-`client.read` for batches and crawls implicitly calls `waitForJob`, so you get a completed job back without writing any loop yourself. That's enough for most scripts and CLI tools.
+`reader.read` for batches and crawls implicitly calls `waitForJob`, so you get a completed job back without writing any loop yourself. That's enough for most scripts and CLI tools.
 
 ## When you want explicit control
 
 If you want to show progress, set a custom timeout, or break out early, call `getJob` directly:
 
 ```ts
-const { data: job } = await client.request("POST", "/v1/read", {
+const { data: job } = await reader.request("POST", "/v1/read", {
   urls: ["https://example.com/a", "https://example.com/b"],
 });
 const jobId = job.id;
@@ -41,13 +41,13 @@ const timeout = 5 * 60_000; // 5 minutes
 const start = Date.now();
 
 while (Date.now() - start < timeout) {
-  const { job } = await client.getJob(jobId, { limit: 1 });
+  const { job } = await reader.getJob(jobId, { limit: 1 });
 
   console.log(`${job.status}: ${job.completed}/${job.total}`);
 
   if (["completed", "failed", "cancelled"].includes(job.status)) {
     if (job.status === "completed") {
-      const allResults = await client.getAllJobResults(jobId);
+      const allResults = await reader.getAllJobResults(jobId);
       console.log(`Finished: ${allResults.length} pages`);
     } else {
       console.error(`Job ${job.status}: ${job.error}`);

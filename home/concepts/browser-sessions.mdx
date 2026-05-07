@@ -33,10 +33,10 @@ The browser has anti-bot stealth active: `navigator.webdriver = false`, navigato
 import { ReaderClient } from "@vakra-dev/reader-js";
 import { chromium } from "playwright-core";
 
-const client = new ReaderClient({ apiKey: process.env.READER_API_KEY });
+const reader = new ReaderClient({ apiKey: process.env.READER_API_KEY });
 
 // One API call to create a stealthed browser
-const session = await client.sessions.create();
+const session = await reader.sessions.create();
 
 // One-line change from a local Playwright script
 const browser = await chromium.connectOverCDP(session.wsEndpoint);
@@ -47,7 +47,7 @@ console.log(await page.title());
 
 // Cleanup
 await browser.close();
-await client.sessions.stop(session.sessionId);
+await reader.sessions.stop(session.sessionId);
 ```
 
 ## Stealth Features

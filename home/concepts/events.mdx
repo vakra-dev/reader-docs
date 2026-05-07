@@ -41,7 +41,7 @@ The stream terminates automatically when the job reaches a terminal state.
 Use the SDK's `stream(jobId)` generator if you're in TypeScript:
 
 ```ts
-for await (const event of client.stream(jobId)) {
+for await (const event of reader.stream(jobId)) {
   if (event.type === "page") handlePage(event.data);
   if (event.type === "done") break;
 }

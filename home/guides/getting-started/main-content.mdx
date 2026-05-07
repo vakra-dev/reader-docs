@@ -10,14 +10,14 @@ For most use cases (LLM pipelines, RAG indexing, clean markdown output for human
 ## Leave it on (the default)
 
 ```ts
-await client.read({ url: "https://example.com/blog/post" });
+await reader.read({ url: "https://example.com/blog/post" });
 // Returns the article only, no "Sign up for our newsletter" CTA in your LLM context
 ```
 
 ## Turn it off
 
 ```ts
-await client.read({
+await reader.read({
   url: "https://example.com/blog/post",
   onlyMainContent: false,
 });

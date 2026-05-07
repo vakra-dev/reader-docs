@@ -16,7 +16,7 @@ The biggest footgun is firing sync scrapes in a `for` loop:
 ```ts
 // BAD: 1000 RPM for 1000 URLs
 for (const url of urls) {
-  await client.read({ url });
+  await reader.read({ url });
 }
 ```
 
@@ -24,7 +24,7 @@ One `POST /v1/read` with `urls: [...]` counts as **one** request toward RPM:
 
 ```ts
 // GOOD: 1 RPM for 1000 URLs
-await client.read({ urls }); // creates a job, SDK polls to completion
+await reader.read({ urls }); // creates a job, SDK polls to completion
 ```
 
 Polling that job is more requests, but polling once every 5 seconds for a minute is 12 requests, not 1000.
@@ -61,7 +61,7 @@ async function processBatch(urls: string[], rpm = 55) {
   const delayMs = 60_000 / rpm; // ~1090ms at 55 RPM (5 RPM headroom)
   for (const url of urls) {
     const start = Date.now();
-    await client.read({ url });
+    await reader.read({ url });
     const elapsed = Date.now() - start;
     const wait = Math.max(0, delayMs - elapsed);
     if (wait > 0) await sleep(wait);
@@ -76,7 +76,7 @@ Leave a little headroom below your tier's RPM. Other parts of your system (credi
 ```ts
 // BAD: 60 requests per minute just watching one job
 while (!done) {
-  const { job } = await client.getJob(jobId);
+  const { job } = await reader.getJob(jobId);
   if (terminal(job)) break;
   await sleep(1000);
 }

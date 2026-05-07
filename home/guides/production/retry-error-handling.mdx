@@ -33,13 +33,13 @@ import {
   ScrapeTimeoutError,
 } from "@vakra-dev/reader-js";
 
-const client = new ReaderClient({
+const reader = new ReaderClient({
   apiKey: process.env.READER_KEY!,
   maxRetries: 3, // default is 2
 });
 
 try {
-  const result = await client.read({ url });
+  const result = await reader.read({ url });
   // handle result
 } catch (err) {
   if (err instanceof InsufficientCreditsError) {
@@ -50,7 +50,7 @@ try {
     console.error(`Give up after rate limit, retry in ${err.retryAfterSeconds}s`);
   } else if (err instanceof ScrapeTimeoutError) {
     // Bump timeout and try once more manually
-    await client.read({ url, timeoutMs: 60_000 });
+    await reader.read({ url, timeoutMs: 60_000 });
   } else {
     throw err; // unknown, re-raise
   }

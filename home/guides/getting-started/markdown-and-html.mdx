@@ -8,7 +8,7 @@ Reader can return the same scrape as multiple formats in one request. You pay fo
 ## Request both
 
 ```ts
-const result = await client.read({
+const result = await reader.read({
   url: "https://example.com/blog/post",
   formats: ["markdown", "html"],
 });

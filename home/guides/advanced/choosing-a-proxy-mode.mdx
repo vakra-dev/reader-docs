@@ -10,7 +10,7 @@ Most callers should leave `proxyMode` unset and let Reader default to `auto`. Th
 Use `auto` unless you have a specific reason not to. It's free to use (same price as `standard` when the target is friendly, 3x when it needs to escalate) and it handles the mixed real-world case: some pages behave, some don't, and you don't have to think about which is which.
 
 ```ts
-await client.read({ url }); // implicit proxyMode: "auto"
+await reader.read({ url }); // implicit proxyMode: "auto"
 ```
 
 ## When to force `standard`
@@ -22,7 +22,7 @@ Force `proxyMode: "standard"` when:
 - **You want an error signal for blocks.** If you force `standard` and the target blocks you, Reader returns an error rather than silently escalating. You find out immediately that something changed, which is valuable when you're scraping a site you thought was friendly.
 
 ```ts
-await client.read({
+await reader.read({
   url: "https://docs.example.com/api/v1/reference",
   proxyMode: "standard",
 });
@@ -37,7 +37,7 @@ Force `proxyMode: "stealth"` when:
 - **You tried `auto` and escalation is happening 80%+ of the time.** At that point you're paying the standard attempt as pure overhead. Switch to explicit stealth and save the wasted credits.
 
 ```ts
-await client.read({
+await reader.read({
   url: "https://www.amazon.com/dp/B08N5WRWNW",
   proxyMode: "stealth",
 });

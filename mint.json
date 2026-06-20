@@ -23,12 +23,12 @@
     },
     {
       "name": "Dashboard",
-      "url": "https://app.reader.dev"
+      "url": "https://console.reader.dev"
     }
   ],
   "topbarCtaButton": {
     "name": "Sign up free",
-    "url": "https://app.reader.dev/register"
+    "url": "https://console.reader.dev/register"
   },
   "tabs": [
     {

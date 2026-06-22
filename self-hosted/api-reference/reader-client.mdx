@@ -3,7 +3,7 @@ title: "ReaderClient"
 description: "Constructor, options, methods, and lifecycle for the main Reader API."
 ---
 
-`ReaderClient` is the high-level API you'll use for 99% of self-hosted Reader workloads. It owns the HeroCore instance and the browser pool, exposes `scrape()` and `crawl()`, and handles lazy initialization.
+`ReaderClient` is the high-level API you'll use for 99% of self-hosted Reader workloads. It owns the Playwright pool and the browser instances, exposes `scrape()` and `crawl()`, and handles lazy initialization.
 
 ## Constructor
 
@@ -45,7 +45,7 @@ See [BrowserPoolConfig](/self-hosted/concepts/browser-pool) and [ProxyConfig](/s
 async start(): Promise<void>
 ```
 
-Pre-warm the client. Initializes HeroCore and the browser pool without running a scrape. Optional - `scrape()` and `crawl()` will initialize automatically if you haven't called `start()`.
+Pre-warm the client. Initializes the Playwright pool and browser instances without running a scrape. Optional - `scrape()` and `crawl()` will initialize automatically if you haven't called `start()`.
 
 ```typescript
 async scrape(options: ScrapeOptions): Promise<ScrapeResult>
@@ -83,7 +83,7 @@ Helpers for checking proxy pool availability. Useful when you want to gate behav
 ReaderClient is lazy by design:
 
 1. `new ReaderClient()` - constructor does nothing expensive
-2. First call to `scrape()` or `crawl()` - triggers HeroCore startup and browser pool initialization (1-2 seconds)
+2. First call to `scrape()` or `crawl()` - triggers Playwright pool startup and browser initialization (1-2 seconds)
 3. Subsequent calls - reuse the warm pool
 4. Auto cleanup on `SIGTERM`/`SIGINT`/process exit
 5. Explicit `close()` - tears down browsers immediately

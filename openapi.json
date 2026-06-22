@@ -141,6 +141,10 @@
           "html": {
             "type": "string"
           },
+          "screenshot": {
+            "type": "string",
+            "description": "Base64-encoded PNG screenshot of the full page. Only present when \"screenshot\" is included in formats."
+          },
           "metadata": {
             "$ref": "#/components/schemas/ScrapeMetadata"
           }
@@ -302,7 +306,8 @@
               "type": "string",
               "enum": [
                 "markdown",
-                "html"
+                "html",
+                "screenshot"
               ]
             },
             "description": "Content formats to include in the response.",
@@ -505,6 +510,10 @@
           },
           "html": {
             "type": "string"
+          },
+          "screenshot": {
+            "type": "string",
+            "description": "Base64-encoded PNG screenshot."
           },
           "statusCode": {
             "type": "integer"

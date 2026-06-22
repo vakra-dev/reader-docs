@@ -7,10 +7,10 @@ The browser pool is how self-hosted Reader scales. Spinning up a new headless Ch
 
 ## What's in the pool
 
-Each entry in the pool is a Hero browser instance:
+Each entry in the pool is a Chrome instance managed by Playwright:
 
-- A running headless Chrome process
-- A Hero Core connection for scripting it
+- A running headless Chrome process (spawned via `child_process.spawn`)
+- A Playwright connection over CDP for scripting it
 - A small amount of bookkeeping (page count, age, health)
 
 When you call `scrape()` or `crawl()`, Reader checks out an available instance, runs the request, and checks it back in. If no instance is free, the request queues.

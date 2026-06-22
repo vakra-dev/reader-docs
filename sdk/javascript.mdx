@@ -67,6 +67,23 @@ if (result.kind === "scrape") {
 }
 ```
 
+### Screenshots
+
+Request a screenshot alongside content:
+
+```typescript
+const result = await reader.read({
+  url: "https://example.com",
+  formats: ["markdown", "screenshot"],
+});
+
+if (result.kind === "scrape" && result.data.screenshot) {
+  // screenshot is a base64-encoded PNG
+  const buffer = Buffer.from(result.data.screenshot, "base64");
+  fs.writeFileSync("screenshot.png", buffer);
+}
+```
+
 ### Multiple URLs (batch)
 
 Passing `urls` creates an async job. The SDK auto-polls until the job terminates and returns `{ kind: "job", data: Job }` with all results collected across pagination.

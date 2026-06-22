@@ -1,0 +1,203 @@
+---
+title: "CLI"
+description: "Read the web from your terminal. Built for AI coding agents."
+---
+
+The Reader CLI lets you scrape, crawl, and take screenshots from the command line. It's a thin wrapper around the [Reader API](/api-reference/read) - no local browser needed.
+
+Built for AI coding agents like Claude Code, Cursor, and Codex, but works great for humans too.
+
+## Install
+
+```bash
+npm install -g @vakra-dev/reader-cli
+```
+
+Or run directly without installing:
+
+```bash
+npx @vakra-dev/reader-cli scrape https://example.com
+```
+
+## Authentication
+
+<Tabs>
+  <Tab title="For humans">
+    Run once to save your API key:
+    ```bash
+    reader config set api-key rdr_your_key_here
+    ```
+    The key is saved to `~/.reader/config.json` and used for all future commands.
+  </Tab>
+  <Tab title="For AI agents / CI">
+    Set the environment variable:
+    ```bash
+    export READER_API_KEY=rdr_your_key_here
+    ```
+    The env var takes precedence over the config file. No disk writes needed.
+  </Tab>
+</Tabs>
+
+Get your API key from the [Reader dashboard](https://console.reader.dev).
+
+## Scrape a page
+
+```bash
+reader scrape https://example.com
+```
+
+Output is clean markdown, printed to stdout. Pipe it anywhere:
+
+```bash
+reader scrape https://docs.stripe.com/payments > stripe-payments.md
+```
+
+### Formats
+
+```bash
+reader scrape https://example.com                    # markdown (default)
+reader scrape https://example.com -f html             # cleaned HTML
+reader scrape https://example.com -f screenshot -o page.png  # full-page PNG
+```
+
+### JSON output
+
+Get the full API response with metadata:
+
+```bash
+reader scrape https://example.com --json
+```
+
+```json
+{
+  "url": "https://example.com",
+  "markdown": "# Example Domain\n\n...",
+  "metadata": {
+    "duration": 892,
+    "cached": false,
+    "proxyMode": "standard"
+  },
+  "pageMetadata": {
+    "title": "Example Domain"
+  }
+}
+```
+
+### Options
+
+```bash
+reader scrape <url> [options]
+
+Options:
+  -f, --format <format>    markdown (default), html, screenshot
+  --json                   Full JSON response
+  -o, --output <file>      Write to file
+  --no-main-content        Include nav, header, footer
+  --include-tags <sel>     CSS selectors to keep (comma-separated)
+  --exclude-tags <sel>     CSS selectors to remove (comma-separated)
+  --wait-for <selector>    Wait for element before capturing
+  --timeout <ms>           Timeout in milliseconds (default: 30000)
+  --proxy-mode <mode>      standard, stealth, auto
+```
+
+## Crawl a site
+
+Discover and scrape all pages on a website:
+
+```bash
+reader crawl https://docs.example.com
+```
+
+Each page's markdown is output separated by `---`. Save to individual files:
+
+```bash
+reader crawl https://docs.example.com -o ./docs/
+```
+
+### URL discovery only
+
+List all discovered URLs without scraping content:
+
+```bash
+reader crawl https://docs.example.com --urls-only
+```
+
+### Options
+
+```bash
+reader crawl <url> [options]
+
+Options:
+  --max-depth <n>          Crawl depth (default: 2)
+  --max-pages <n>          Max pages (default: 20)
+  --urls-only              Only list URLs, don't scrape
+  --json                   Full JSON response
+  -o, --output-dir <dir>   Write each page to a separate file
+```
+
+## Check status
+
+Verify your setup and see your credit balance:
+
+```bash
+reader status
+```
+
+```
+Reader CLI v0.1.0
+API:     https://api.reader.dev
+Key:     rdr_...c3bb
+Credits: 874 / 1000 (free tier)
+Resets:  2026-07-01
+```
+
+## Check credits
+
+```bash
+reader credits
+```
+
+```
+Balance: 874 / 1000
+Used:    126
+Tier:    free
+Resets:  2026-07-01T00:00:00.000Z
+```
+
+## Configuration
+
+```bash
+reader config set api-key <key>     # save API key
+reader config set api-url <url>     # custom API URL
+reader config show                  # show current config
+```
+
+Config is stored at `~/.reader/config.json`. Environment variables always take precedence:
+
+| Setting | Env var | Config key |
+| --- | --- | --- |
+| API key | `READER_API_KEY` | `apiKey` |
+| API URL | `READER_API_URL` | `apiUrl` |
+
+## For AI agents
+
+The CLI is designed to work seamlessly with AI coding agents:
+
+- **Markdown to stdout** - agents read the content directly
+- **Errors to stderr** - never pollutes piped output
+- **Exit codes** - 0 on success, 1 on error
+- **No interactive prompts** - everything via flags and env vars
+- **`--json` flag** - structured output for programmatic use
+
+Example in a Claude Code or Cursor workflow:
+
+```bash
+# Agent reads documentation to answer a question
+reader scrape https://docs.stripe.com/payments/quickstart
+
+# Agent crawls a site for context
+reader crawl https://docs.example.com --max-pages 10 -o ./context/
+
+# Agent takes a screenshot for visual analysis
+reader scrape https://example.com -f screenshot -o page.png
+```

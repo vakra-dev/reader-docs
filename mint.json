@@ -65,7 +65,8 @@
       "group": "Get Started",
       "pages": [
         "home/introduction",
-        "home/quickstart"
+        "home/quickstart",
+        "home/cli"
       ]
     },
     {

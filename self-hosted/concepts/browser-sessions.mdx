@@ -5,27 +5,26 @@ description: "Launch stealthed Chrome for Playwright/Puppeteer automation"
 
 # Browser Sessions
 
-The `browser()` primitive launches a Hero-stealthed Chrome and returns a CDP WebSocket URL. Connect Playwright or Puppeteer to automate pages with anti-bot stealth active.
+The `browser()` primitive launches a stealthed Chrome instance and returns a CDP WebSocket URL. Connect Playwright or Puppeteer to automate pages with anti-bot stealth active.
 
 ## How It Works
 
 ```
 reader.browser()
     │
-    ├── Creates a dedicated HeroCore instance
-    ├── Launches Chrome with stealth emulation scripts
+    ├── Spawns a dedicated Chrome process via child_process.spawn
+    ├── Applies stealth flags and emulation scripts
     ├── Extracts CDP WebSocket URL
-    ├── Disables internal target tracking for external clients
     │
     ▼
 session.wsEndpoint  →  Playwright/Puppeteer connects
 ```
 
-Each session gets its own Chrome process, separate from the scrape/crawl browser pool. This isolates sessions from scraping throughput.
+Each session gets its own Chrome process, spawned directly (not from the Playwright pool). This isolates sessions from scraping throughput.
 
 ## Stealth Features
 
-Sessions inherit Hero's emulation scripts:
+Sessions apply stealth via Chrome flags and emulation scripts:
 
 | Feature | Active | Mechanism |
 |---------|--------|-----------|
@@ -33,9 +32,8 @@ Sessions inherit Hero's emulation scripts:
 | Navigator spoofing | Yes | injected at BrowserContext level |
 | WebGL fingerprinting | Yes | injected at BrowserContext level |
 | WebRTC IP masking | Yes | injected at BrowserContext level |
-| TLS fingerprinting (MITM) | No | MITM proxy disabled for sessions |
 
-**Note on MITM:** Hero's TLS fingerprint emulation uses a MITM proxy that tracks connections by socket. External CDP clients create new sockets the MITM can't track, so it's disabled for sessions. The emulation scripts provide the primary stealth layer without MITM.
+Sessions use direct Chrome spawn (the same as the scrape engine), so all stealth features are applied identically.
 
 ## Usage
 
@@ -71,7 +69,7 @@ reader browser stop <sessionId>
 
 ## Resource Usage
 
-- Each session uses ~300MB memory (Chrome + HeroCore)
+- Each session uses ~300MB memory (Chrome process)
 - Sessions are isolated from the scrape/crawl pool
 - Default timeout: 5 minutes (configurable via `timeoutMs`)
 

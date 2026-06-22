@@ -78,6 +78,25 @@ if result.kind == "scrape":
     print(result.data.metadata.proxy_escalated)    # True only if auto escalated
 ```
 
+### Screenshots
+
+Request a screenshot alongside content:
+
+```python
+import base64
+
+result = reader.read(
+    url="https://example.com",
+    formats=["markdown", "screenshot"],
+)
+
+if result.kind == "scrape" and result.data.screenshot:
+    # screenshot is a base64-encoded PNG
+    png_bytes = base64.b64decode(result.data.screenshot)
+    with open("screenshot.png", "wb") as f:
+        f.write(png_bytes)
+```
+
 ### Multiple URLs (batch)
 
 Passing `urls` creates an async job. The SDK auto-polls until the job terminates and returns `ReadResult(kind="job", data=Job)` with all results collected across pagination.

@@ -92,10 +92,10 @@ Residential proxies are typically billed per-request AND per-IP - cycling IPs on
 Reader handles this with **sticky sessions**: for residential proxies, Reader generates a unique session ID and passes it to the proxy provider in the URL:
 
 ```
-http://customer-abc_session-hero_1234567_abc_country-us:secret@residential.proxy-provider.com:12321
+http://customer-abc_session-reader_1234567_abc_country-us:secret@residential.proxy-provider.com:12321
 ```
 
-The `session-hero_...` parameter tells the provider "keep this IP for this session." All requests in the same crawl session use the same IP, mimicking a real user.
+The `session-reader_...` parameter tells the provider "keep this IP for this session." All requests in the same crawl session use the same IP, mimicking a real user.
 
 ## Flat proxy list (legacy)
 
@@ -126,6 +126,6 @@ If you want different crawls to use different proxies, just call `crawl()` multi
     Practical setup for single proxies, pools, and escalation.
   </Card>
   <Card title="Scraping Engine" icon="layer-group" href="/self-hosted/concepts/engine-waterfall">
-    How the Hero engine and proxy escalation work together.
+    How the Playwright engine and proxy escalation work together.
   </Card>
 </CardGroup>

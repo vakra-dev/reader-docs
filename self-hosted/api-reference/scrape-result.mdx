@@ -25,7 +25,7 @@ interface WebsiteScrapeResult {
   metadata: {
     baseUrl: string;
     statusCode: number;
-    engine: "hero";
+    engine: "playwright";
     totalPages: number;
     scrapedAt: string;   // ISO timestamp
     duration: number;    // milliseconds
@@ -42,7 +42,7 @@ interface WebsiteScrapeResult {
 | `html` | Cleaned HTML output (if `"html"` in formats) |
 | `metadata.baseUrl` | The original URL that was scraped |
 | `metadata.statusCode` | HTTP status returned by the server |
-| `metadata.engine` | Engine used (`"hero"`) |
+| `metadata.engine` | Engine used (`"playwright"`) |
 | `metadata.duration` | Total time in milliseconds |
 | `metadata.scrapedAt` | ISO timestamp when the scrape completed |
 | `metadata.website` | Parsed page metadata (title, OG tags, etc.) |

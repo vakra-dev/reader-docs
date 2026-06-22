@@ -13,15 +13,15 @@ npm install @vakra-dev/reader
 
 - **Node.js 22.12.0+**. Reader has ESM compatibility issues with Bun - use Node.
 - **x86_64 architecture** for Docker. Chromium is bundled as x86_64 only, so Apple Silicon Macs must use native Node.js or a remote Linux server for Docker deployments.
-- **Chrome system libraries** on Linux (see below). On macOS, Hero downloads Chrome automatically on first run.
+- **Chrome system libraries** on Linux (see below). On macOS, Chrome is resolved automatically on first run.
 
 <Warning>
-Bun is not supported. The underlying Hero browser automation library has ESM compatibility issues with the Bun runtime. Use `node` or `npx tsx`.
+Bun is not supported. The underlying browser automation stack has ESM compatibility issues with the Bun runtime. Use `node` or `npx tsx`.
 </Warning>
 
 ## macOS
 
-Nothing extra needed. Install the package and run your code - Hero downloads a matching Chrome build automatically on first use.
+Nothing extra needed. Install the package and run your code - Chrome is resolved automatically on first use.
 
 ```bash
 npm install @vakra-dev/reader

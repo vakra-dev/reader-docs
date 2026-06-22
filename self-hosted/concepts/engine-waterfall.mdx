@@ -1,9 +1,9 @@
 ---
 title: "Scraping Engine"
-description: "Hero browser engine with proxy escalation for reliable scraping."
+description: "Playwright browser engine with proxy escalation for reliable scraping."
 ---
 
-Reader uses a single scraping engine: **Hero** - a full headless Chrome browser via the [Ulixee Hero](https://ulixee.org/) framework. Every scrape runs through Hero, which handles JavaScript execution, TLS fingerprinting, and anti-bot bypass natively.
+Reader uses a single scraping engine: **Playwright** - a full headless Chrome browser connected via CDP. Chrome is spawned directly via `child_process.spawn` and Playwright connects over the Chrome DevTools Protocol. Every scrape runs through this engine, which handles JavaScript execution and anti-bot bypass via Chrome flags and the playwright-extra stealth plugin.
 
 ## Why a single engine?
 
@@ -23,16 +23,16 @@ Each scrape attempt opens a fresh tab in a warm Chrome process (the browser pool
 5. Close tab (Chrome stays alive for next request)
 ```
 
-The browser is bound to a specific proxy, so all traffic from that tab routes through the configured proxy IP via Hero's MITM layer.
+The browser is bound to a specific proxy, so all traffic from that tab routes through the configured proxy IP.
 
 ## Proxy escalation
 
 Reader uses a two-step retry strategy per URL:
 
 ```
-Attempt 1: Hero on datacenter proxy (10s timeout)
+Attempt 1: Playwright on datacenter proxy (10s timeout)
     ↓ any failure (timeout, empty, blocked, error)
-Attempt 2: Hero on residential proxy (remaining time, up to 30s total)
+Attempt 2: Playwright on residential proxy (remaining time, up to 30s total)
     ↓ any failure
     Done - report error
 ```
@@ -46,7 +46,7 @@ The timeouts are configurable via `hardDeadlineMs` (total cap, default 30s) and 
 
 ## Quality check
 
-After Hero returns HTML, the orchestrator runs a minimal quality check:
+After the engine returns HTML, the orchestrator runs a minimal quality check:
 
 - **HTTP 2xx/3xx with any text content** → pass
 - **HTTP 2xx with empty body** → fail (`empty_content`)

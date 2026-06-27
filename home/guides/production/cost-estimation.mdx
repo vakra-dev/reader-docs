@@ -14,8 +14,7 @@ cost = (number of pages) × (credits per page for the mode)
 Credits per page:
 
 - `standard`: **1**
-- `stealth`: **3**
-- `auto`: 1 or 3 depending on whether Reader escalates (see below)
+- `premium`: **3**
 
 Cache hits are **0** regardless of mode, so if you've scraped a URL recently and it's still within the 24h TTL, that specific page is free.
 
@@ -27,9 +26,9 @@ Trivial. If you know the page count, you know the cost.
 1,000 URLs × 1 credit = 1,000 credits
 ```
 
-Force `proxyMode: "standard"` in your request if you want the cost guarantee. Reader will error on a blocked page instead of silently escalating.
+`standard` is the default. Reader will return an error on a blocked page rather than silently charging more.
 
-## Estimating for `stealth`
+## Estimating for `premium`
 
 Also trivial, just 3x:
 
@@ -37,57 +36,52 @@ Also trivial, just 3x:
 1,000 URLs × 3 credits = 3,000 credits
 ```
 
-Force this mode only when you know the target site needs it. See [Choosing a proxy mode](/home/guides/advanced/choosing-a-proxy-mode).
+Use `premium` only when you know the target site needs it. See [Choosing a proxy mode](/home/guides/advanced/choosing-a-proxy-mode).
 
-## Estimating for `auto`
+## Estimating for a mixed batch
 
-The hard case. `auto` only costs 3x for the subset of pages that actually escalate. You need an **escalation rate**: the fraction of requests that fall back to stealth.
+If you have a mix of standard and premium URLs, calculate each group separately:
 
 ```
-auto cost = (pages × 1) + (pages × escalation_rate × 2)
-         = pages × (1 + 2 × escalation_rate)
+cost = (standard_pages × 1) + (premium_pages × 3)
 ```
 
-Typical escalation rates by site type:
+Common cost profiles by site type:
 
-| Target type | Expected escalation | Effective cost per page |
+| Target type | Recommended mode | Cost per page |
 | --- | --- | --- |
-| Blogs, docs, news sites | 0–5% | ~1.0–1.1 |
-| Marketing pages, public APIs | 0–10% | ~1.0–1.2 |
-| E-commerce (general) | 20–50% | ~1.4–2.0 |
-| E-commerce (Amazon, Walmart, etc.) | 80–100% | ~2.6–3.0 |
-| LinkedIn, booking sites, aggressive anti-bot | 95–100% | ~2.9–3.0 |
-
-When in doubt, assume 2x (effective cost 1.5 credits per page) for mixed workloads.
+| Blogs, docs, news sites | `standard` | 1 |
+| Marketing pages, public APIs | `standard` | 1 |
+| E-commerce (general) | `standard` | 1 |
+| E-commerce (Amazon, Walmart, etc.) | `premium` | 3 |
+| LinkedIn, booking sites, aggressive anti-bot | `premium` | 3 |
 
 ## Pilot first
 
-For any batch above a few hundred URLs, run a **pilot** on a representative subset of 50–100 URLs, then measure the real escalation rate:
+For any batch above a few hundred URLs against unfamiliar sites, run a **pilot** on a representative subset of 50-100 URLs with `standard` mode first. Check success rates and markdown quality:
 
 ```ts
 const pilot = await reader.read({ urls: sampleUrls });
-let escalated = 0;
+let blocked = 0;
 let total = 0;
 
 if (pilot.kind === "job") {
   for (const page of pilot.data.results) {
     if (page.error) continue;
     total += 1;
-    if (page.proxyMode === "stealth") escalated += 1;
+    // Flag suspiciously thin content as likely blocked
+    if ((page.markdown?.length ?? 0) < 500) blocked += 1;
   }
 }
 
-const escalationRate = escalated / total;
-const estimatedCost =
-  allUrls.length * (1 + 2 * escalationRate);
-
+const blockRate = blocked / total;
 console.log(
-  `Pilot escalation: ${(escalationRate * 100).toFixed(0)}%, ` +
-    `estimated total cost: ${estimatedCost.toFixed(0)} credits`,
+  `Block rate: ${(blockRate * 100).toFixed(0)}% - ` +
+    `consider premium for these ${blocked} URLs`,
 );
 ```
 
-Now you have a real number grounded in the actual site you're targeting, not a guess.
+Now you have a real number grounded in the actual site you're targeting.
 
 ## Crawl cost
 

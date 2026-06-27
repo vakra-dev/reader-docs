@@ -1,38 +1,38 @@
 ---
 title: "Proxy Tiers"
-description: "Datacenter vs residential proxies, rotation, and automatic escalation."
+description: "Standard vs premium proxies: datacenter and residential, rotation, and when to use each."
 ---
 
-Proxies are how Reader scrapes sites that would otherwise block or rate-limit a single IP. Reader supports **two tiers** with very different cost and capability profiles, and a unified API for using them together.
+Proxies are how Reader scrapes sites that would otherwise block or rate-limit a single IP. Reader supports **two tiers** with very different cost and capability profiles.
 
 ## The two tiers
 
-### Datacenter
+### Standard (datacenter)
 
 - **Fast** (~50-100ms overhead per request)
 - **Cheap** (pennies per GB)
 - **Easily detected** by sophisticated anti-bot systems - the IP range is a known datacenter
 - **Great for**: APIs, blogs, docs, news sites, anything without aggressive bot protection
 
-### Residential
+### Premium (residential)
 
 - **Slow** (300-800ms overhead per request)
 - **Expensive** (dollars per GB)
 - **Indistinguishable from a real user** - the IP is a real home ISP
 - **Great for**: Amazon, LinkedIn, ticketing sites, anything that aggressively blocks datacenters
 
-You'll use datacenter for 95% of requests and residential only when necessary. The goal of Reader's multi-tier support is to make that split automatic.
+You'll use standard for the vast majority of requests and premium only when necessary.
 
 ## Configuring both tiers
 
 ```javascript
 const reader = new ReaderClient({
   proxyPools: {
-    datacenter: [
+    standard: [
       { url: "http://user:pass@dc1.example.com:8080" },
       { url: "http://user:pass@dc2.example.com:8080" },
     ],
-    residential: [
+    premium: [
       {
         type: "residential",
         host: "residential.proxy-provider.com",
@@ -50,46 +50,35 @@ Both pools can have any number of proxies. Rotation within a tier is round-robin
 
 ## Tier selection per request
 
-Three modes:
+Two modes:
 
-### Explicit datacenter
+### Explicit standard
 
 ```javascript
 await reader.scrape({
   urls: ["https://news.example.com/article"],
-  proxyTier: "datacenter",
+  proxyTier: "standard",
 });
 ```
 
-Always pulls from the datacenter pool. Cheapest option - use when you know the target doesn't need residential.
+Always pulls from the standard (datacenter) pool. Cheapest option - use when you know the target doesn't need residential.
 
-### Explicit residential
+### Explicit premium
 
 ```javascript
 await reader.scrape({
   urls: ["https://www.amazon.com/dp/B08N5WRWNW"],
-  proxyTier: "residential",
+  proxyTier: "premium",
 });
 ```
 
-Always pulls from the residential pool. Use when you know the target needs residential - don't waste credits trying datacenter first.
+Always pulls from the premium (residential) pool. Use when you know the target needs residential - don't waste resources trying standard first.
 
-### Auto (recommended)
+## Sticky sessions for premium
 
-```javascript
-await reader.scrape({
-  urls: ["https://linkedin.com/in/someone"],
-  proxyTier: "auto",
-});
-```
+Premium (residential) proxies are typically billed per-request AND per-IP - cycling IPs on every request is wasteful and also tends to trigger anti-bot systems (real users don't jump IPs mid-session).
 
-Starts with **datacenter**. If the request is blocked (detected via status codes, challenge pages, or specific block patterns), Reader **escalates to residential** on a retry. You pay datacenter cost for 95% of URLs and residential cost only for the ones that actually need it.
-
-## Sticky sessions for residential
-
-Residential proxies are typically billed per-request AND per-IP - cycling IPs on every request is wasteful and also tends to trigger anti-bot systems (real users don't jump IPs mid-session).
-
-Reader handles this with **sticky sessions**: for residential proxies, Reader generates a unique session ID and passes it to the proxy provider in the URL:
+Reader handles this with **sticky sessions**: for premium proxies, Reader generates a unique session ID and passes it to the proxy provider in the URL:
 
 ```
 http://customer-abc_session-reader_1234567_abc_country-us:secret@residential.proxy-provider.com:12321
@@ -123,9 +112,9 @@ If you want different crawls to use different proxies, just call `crawl()` multi
 
 <CardGroup cols={2}>
   <Card title="Proxy Configuration guide" icon="network-wired" href="/self-hosted/guides/proxy-configuration">
-    Practical setup for single proxies, pools, and escalation.
+    Practical setup for single proxies, pools, and tier selection.
   </Card>
   <Card title="Scraping Engine" icon="layer-group" href="/self-hosted/concepts/engine-waterfall">
-    How the Playwright engine and proxy escalation work together.
+    How the Playwright engine and proxy tiers work together.
   </Card>
 </CardGroup>

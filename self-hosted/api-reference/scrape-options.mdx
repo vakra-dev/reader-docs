@@ -33,12 +33,12 @@ description: "Every field accepted by scrape() with type and default."
 | `removeBase64Images` | `boolean` | `true` | Strip inline base64 images |
 | `navigationSelectors` | `string[]` | `[]` | Additional CSS selectors to remove when `onlyMainContent` is true. Merged with built-in nav/footer/sidebar selectors. |
 
-## Retry & escalation
+## Retry & timeouts
 
 | Option | Type | Default | Description |
 |---|---|---|---|
 | `hardDeadlineMs` | `number` | `30000` | Hard deadline for a single URL. After this, the scraper gives up. |
-| `datacenterTimeoutMs` | `number` | `10000` | Timeout for the first attempt on datacenter proxy. If no result, escalates to residential. |
+| `datacenterTimeoutMs` | `number` | `10000` | Timeout for a standard (datacenter) proxy attempt. |
 
 ## Batch processing
 
@@ -61,7 +61,7 @@ interface ProgressEvent {
 | Option | Type | Default | Description |
 |---|---|---|---|
 | `proxy` | `ProxyConfig` | - | Single proxy to use for this request |
-| `proxyTier` | `"datacenter" \| "residential" \| "auto"` | - | Pick a proxy from the configured pool by tier |
+| `proxyTier` | `"standard" \| "premium"` | - | Pick a proxy from the configured pool by tier |
 
 ## Pluggable config
 
@@ -75,7 +75,7 @@ These options let the caller inject platform-specific behavior. Reader ships wit
 
 ```typescript
 interface DomainProfile {
-  proxyTier?: "datacenter" | "residential";
+  proxyTier?: "standard" | "premium";
   timeoutMs?: number;
   batchConcurrency?: number;
   minDelayMs?: number;

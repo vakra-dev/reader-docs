@@ -10,8 +10,7 @@ Reader is metered in **credits**. Every successful scrape consumes credits accor
 | Operation | Cost |
 | --- | --- |
 | Scrape in `standard` mode | **1 credit** per page |
-| Scrape in `stealth` mode | **3 credits** per page |
-| Scrape in `auto` mode | 1 credit if resolved to standard, 3 credits if escalated to stealth |
+| Scrape in `premium` mode | **3 credits** per page |
 | Cache hit | **0 credits** (any mode) |
 | Failed scrape (timeout, upstream error, block) | **0 credits** |
 | Crawl | 1 credit per page discovered and scraped |
@@ -53,7 +52,7 @@ if (credits.balance < 100) {
 
 Reader charges credits **after** a scrape succeeds, not before. The pre-flight check only verifies you have enough to *start* the request; the actual deduction happens once the content is in your response.
 
-For `auto` mode, the pre-flight check is optimistic: it assumes 1 credit per page (the `standard` price). If `auto` escalates and the real cost ends up at 3x, your balance can briefly dip below zero for that request. Your next request gets a `402 insufficient_credits` error until your credits reset.
+The pre-flight check verifies you have the correct number of credits for the mode you selected: 1 credit for `standard`, 3 credits for `premium`.
 
 ## Insufficient credits
 
@@ -79,12 +78,7 @@ Before running a large batch, estimate the bill:
 cost = (number of URLs) × (credits per page for the mode you expect)
 ```
 
-For `auto` mode, estimate the mix based on what you know:
-
-- 90%+ of typical web pages resolve to `standard` (1 credit)
-- Sites known to bot-wall hard (Amazon, LinkedIn, booking sites) will resolve to `stealth` (3 credits)
-
-When in doubt, run a pilot of 50 URLs first and check `metadata.proxyMode` across the results. You'll have a real escalation rate instead of a guess. See [Cost estimation](/home/guides/production/cost-estimation).
+Know your target sites before running large batches. Standard works for 90%+ of the web. Sites known to require bot bypass (Amazon, LinkedIn, booking sites) need `premium`. See [Cost estimation](/home/guides/production/cost-estimation).
 
 ## Browser session costs
 

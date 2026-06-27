@@ -51,7 +51,7 @@ You'll see Reader initialize, render the page in a headless browser, extract the
 
 1. **`new ReaderClient(...)`** - creates a client. No browser yet.
 2. **`reader.scrape(...)`** - on the first call, Reader spins up a browser pool behind the scenes and runs the scrape. The pool stays alive for subsequent calls.
-3. **Playwright engine** - Reader renders the page in headless Chrome with JavaScript execution and proxy routing. If the first attempt fails, it escalates to a residential proxy automatically.
+3. **Playwright engine** - Reader renders the page in headless Chrome with JavaScript execution and proxy routing. Use `proxyTier: "premium"` to route through residential proxies for hostile sites.
 4. **Content cleaning** - by default, Reader extracts only the main content, strips ads and navigation, and converts to clean markdown.
 5. **`reader.close()`** - shuts down browsers. Optional - Reader also auto-cleans on `SIGTERM` / `SIGINT`.
 
@@ -94,7 +94,7 @@ await reader.close();
     Crawling, proxy rotation, dynamic content, and more.
   </Card>
   <Card title="Concepts: Scraping Engine" icon="lightbulb" href="/self-hosted/concepts/engine-waterfall">
-    How the Playwright engine and proxy escalation work.
+    How the Playwright engine and proxy tiers work.
   </Card>
   <Card title="Guides: Batch Scraping" icon="layer-group" href="/self-hosted/guides/batch-scraping">
     Tune concurrency, handle errors, track progress.

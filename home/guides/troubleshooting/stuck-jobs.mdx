@@ -28,7 +28,7 @@ Check again in a minute. If `completed` hasn't moved:
 Open a few of the URLs in your browser. If they're slow or failing in a browser, Reader is seeing the same thing.
 
 - **Site is slow:** bump `timeoutMs` on your next batch (up to 120 seconds) to give each page more budget.
-- **Site is blocking:** try `proxyMode: "stealth"` on a new batch to see if escalation gets through.
+- **Site is blocking:** try `proxyMode: "premium"` on a new batch to see if residential proxies get through.
 - **Site is down:** wait it out or skip those URLs.
 
 ## Step 4: cancel and retry
@@ -42,7 +42,7 @@ await reader.cancelJob(jobId);
 await reader.read({
   urls: failedUrls,
   timeoutMs: 60_000,
-  proxyMode: "stealth",
+  proxyMode: "premium",
 });
 ```
 

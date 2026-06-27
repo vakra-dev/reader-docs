@@ -102,7 +102,7 @@ Use a webhook on batches bigger than a few dozen; polling to completion locks up
 
 ## Cost considerations
 
-A batch of N URLs in `auto` mode costs between N and 3N credits depending on escalation rate. See [Cost estimation](/home/guides/production/cost-estimation) for how to pilot first.
+A batch of N URLs in `standard` mode costs exactly N credits. In `premium` mode it costs 3N credits. If you have a mixed batch, consider pre-splitting by site type. See [Cost estimation](/home/guides/production/cost-estimation) for how to pilot first.
 
 ## Next
 

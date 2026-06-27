@@ -41,7 +41,6 @@ Response (200):
       "duration": 487,
       "cached": false,
       "proxyMode": "standard",
-      "proxyEscalated": false,
       "scrapedAt": "2026-04-04T12:00:00Z"
     }
   }
@@ -89,7 +88,7 @@ Use the `id` to poll `GET /v1/jobs/{id}`, stream progress with SSE, or subscribe
 You tell Reader **what** to fetch. Reader decides **how**:
 
 - How to render the page (full browser with JavaScript execution and stealth evasion).
-- Whether to escalate the proxy from datacenter to residential when a block is detected (see [Proxy modes](/home/concepts/proxy-modes)).
+- Which proxy mode to use based on your `proxyMode` setting (see [Proxy modes](/home/concepts/proxy-modes)).
 - Whether to serve from cache.
 - How to parallelize a batch.
 
@@ -122,5 +121,5 @@ See [Errors](/home/concepts/errors) for the full code catalog.
 ## Next
 
 - [Scrape vs crawl](/home/concepts/scrape-vs-crawl): when to pick which mode
-- [Proxy modes](/home/concepts/proxy-modes): `standard`, `stealth`, and `auto`
+- [Proxy modes](/home/concepts/proxy-modes): `standard` and `premium`
 - [Async jobs](/home/concepts/async-jobs): poll, stream, or webhook-notify

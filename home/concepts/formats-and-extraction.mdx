@@ -109,7 +109,6 @@ Every scrape result includes metadata about the page and the request:
     "duration": 487,
     "cached": false,
     "proxyMode": "standard",
-    "proxyEscalated": false,
     "scrapedAt": "2026-04-04T12:00:00Z"
   }
 }
@@ -119,7 +118,7 @@ Every scrape result includes metadata about the page and the request:
 - `statusCode`: what the target site returned
 - `duration`: how long Reader spent on the request, in ms
 - `cached`: whether the content was served from Reader's cache
-- `proxyMode`, `proxyEscalated`: see [Proxy modes](/home/concepts/proxy-modes)
+- `proxyMode`: which mode ran (`"standard"` or `"premium"`). See [Proxy modes](/home/concepts/proxy-modes)
 - `scrapedAt`: when the content was captured
 
 ## Next

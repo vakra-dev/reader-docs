@@ -50,11 +50,7 @@ try {
 }
 ```
 
-## The `auto` mode escalation edge case
 
-The pre-flight credit check for `auto` mode is optimistic (1 credit per page, not 3). If `auto` escalates to stealth mid-request, your balance can briefly go negative, and the **next** request fails with `insufficient_credits` even though the one that caused the overdraft succeeded.
-
-This is intentional (it mirrors Stripe's metered billing), but it means your error handler should be able to tell the difference between "I genuinely have zero credits" and "I have zero credits because the last request escalated". In both cases the fix is the same: top up, wait for reset, or route to a lower-cost path.
 
 ## Low-credit webhook
 
@@ -83,7 +79,7 @@ When you're out of credits, what should your app actually do?
 - **Cached responses only.** Set `cache: true` (the default) and accept that anything not already cached is unavailable until reset. Cache hits are free.
 - **Queue and defer.** Accept user requests, queue the scrapes, run them when credits come back.
 - **Fail visibly to users.** Better than silent corruption; show a "service degraded" banner.
-- **Switch to a cheaper mode.** Temporarily force `proxyMode: "standard"` instead of `auto` to cut the cost by up to 3x per page.
+- **Switch to a cheaper mode.** Temporarily force `proxyMode: "standard"` instead of `premium` to cut the cost by up to 3x per page.
 
 ## Credit budget per worker
 
@@ -100,7 +96,7 @@ async function scrapeWithBudget(url: string) {
 
   const result = await reader.read({ url });
   // The actual cost is 1 or 3 depending on the resolved mode
-  const cost = result.data.metadata?.proxyMode === "stealth" ? 3 : 1;
+  const cost = result.data.metadata?.proxyMode === "premium" ? 3 : 1;
   dailySpend += cost;
 
   return result;

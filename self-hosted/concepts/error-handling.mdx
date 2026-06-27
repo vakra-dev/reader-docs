@@ -1,6 +1,6 @@
 ---
 title: "Error Handling"
-description: "Typed errors, proxy escalation, and what happens when a scrape fails."
+description: "Typed errors, proxy tiers, and what happens when a scrape fails."
 ---
 
 Every failure in Reader surfaces as a typed error. This page covers the mental model; see [API Reference - Errors](/self-hosted/api-reference/errors) for the full class list.
@@ -51,15 +51,22 @@ Examples of **non-retryable** errors:
 - `PROXY_EXHAUSTED` - all proxy tiers tried and failed
 - `VALIDATION_ERROR` - you passed bad options
 
-## Built-in proxy escalation
+## Proxy tier handling
 
-Reader has a two-step retry per URL built in:
+If a scrape fails with `BOT_DETECTED` using the standard (datacenter) tier, consider retrying with the premium (residential) tier:
 
-1. **Datacenter attempt** (default 10s timeout) - try the URL with a fast, cheap datacenter proxy
-2. **Residential attempt** (remaining time up to 30s total) - if the first attempt fails for any reason, escalate to a residential proxy and try again
-3. **Done** - if both attempts fail, the URL is reported as failed
+```javascript
+try {
+  return await reader.scrape({ urls: [url], proxyTier: "standard" });
+} catch (err) {
+  if (err.code === "BOT_DETECTED") {
+    return await reader.scrape({ urls: [url], proxyTier: "premium" });
+  }
+  throw err;
+}
+```
 
-Non-retryable errors (DNS failure, invalid URL, robots.txt) skip directly to failure without trying the second attempt.
+Non-retryable errors (DNS failure, invalid URL, robots.txt) skip directly to failure without trying another tier.
 
 The timeouts are configurable per-request:
 
@@ -132,6 +139,6 @@ The successful URLs still come back in `result.data`. Batch scraping never throw
     Full table of every error class and its code.
   </Card>
   <Card title="Scraping Engine" icon="layer-group" href="/self-hosted/concepts/engine-waterfall">
-    How the Playwright engine and proxy escalation work.
+    How the Playwright engine and proxy tiers work.
   </Card>
 </CardGroup>

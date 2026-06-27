@@ -16,7 +16,7 @@ Reader is a dependency like any other. You want to know when it's slow, failing,
 | `rate_limited` error count | Your logs | Capacity planning, upgrade signal |
 | `upstream_unavailable` rate | Your logs | Target-site health signal |
 | Webhook delivery failures | Webhook `deliveryStats` | Detect broken listener endpoints |
-| Escalation rate (auto → stealth) | `metadata.proxyEscalated` on each response | Helps you decide when to force a mode |
+| Premium usage rate | `metadata.proxyMode` on each response | Helps you understand which sites need premium |
 
 ## Pulling data from Reader
 
@@ -84,7 +84,7 @@ async function trackedRead(params) {
 
 - **Error rate > 5%** over a 5-minute window → investigate
 - **Credit balance < 20% of limit** → notify ops
-- **p95 latency doubles** → slowdown or escalation spike
+- **p95 latency doubles** → slowdown or site blocking spike
 - **`rate_limited` count > 10 per minute** → need to upgrade or throttle
 - **Webhook `failedDeliveries` rising** → your listener is broken
 

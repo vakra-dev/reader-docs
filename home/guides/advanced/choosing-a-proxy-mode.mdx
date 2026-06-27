@@ -1,86 +1,84 @@
 ---
 title: "Choosing a proxy mode"
-description: "A practical decision guide: when to use standard, stealth, or auto for different sites."
+description: "A practical decision guide: when to use standard vs premium for different sites."
 ---
 
-Most callers should leave `proxyMode` unset and let Reader default to `auto`. This guide is for the minority of cases where overriding pays off.
+Reader has two proxy modes: `standard` (the default, 1 credit per page) and `premium` (3 credits per page, uses residential proxies to bypass bot walls). Most scrapes work fine with standard. This guide is for deciding when to upgrade to premium.
 
-## The default: `auto`
+## The default: `standard`
 
-Use `auto` unless you have a specific reason not to. It's free to use (same price as `standard` when the target is friendly, 3x when it needs to escalate) and it handles the mixed real-world case: some pages behave, some don't, and you don't have to think about which is which.
-
-```ts
-await reader.read({ url }); // implicit proxyMode: "auto"
-```
-
-## When to force `standard`
-
-Force `proxyMode: "standard"` when:
-
-- **You know the target is friendly.** Your own blog, a partner's public docs, a government website, a content API. These don't need stealth; forcing standard saves you from paying 3x on an escalation you were never going to need.
-- **You want a cost guarantee.** With `standard` explicit, every scrape is exactly 1 credit. `auto` can surprise you with 3x credits if escalation kicks in. For a 10,000-URL batch where budget certainty matters, lock the mode.
-- **You want an error signal for blocks.** If you force `standard` and the target blocks you, Reader returns an error rather than silently escalating. You find out immediately that something changed, which is valuable when you're scraping a site you thought was friendly.
+`standard` uses datacenter proxies and works for the vast majority of the web: blogs, documentation sites, news, public APIs, marketing pages, and most government or academic sites. If you have no reason to think a site is hostile, leave `proxyMode` unset and it defaults to `standard`.
 
 ```ts
-await reader.read({
-  url: "https://docs.example.com/api/v1/reference",
-  proxyMode: "standard",
-});
+await reader.read({ url }); // implicit proxyMode: "standard"
 ```
 
-## When to force `stealth`
+## When to force `premium`
 
-Force `proxyMode: "stealth"` when:
+Force `proxyMode: "premium"` when:
 
-- **The target is known-hostile.** Amazon, LinkedIn, booking sites, ticket resellers, most aggressive e-commerce. `auto` would escalate on these anyway, usually on the first page. Forcing stealth skips the wasted standard attempt and gets clean data on the first try.
-- **You're chasing a specific signal.** Sometimes a site blocks standard mode inconsistently: some pages work, others don't. Forcing stealth gives you a consistent experience across the batch.
-- **You tried `auto` and escalation is happening 80%+ of the time.** At that point you're paying the standard attempt as pure overhead. Switch to explicit stealth and save the wasted credits.
+- **The target is known-hostile.** Amazon, LinkedIn, booking sites, ticket resellers, most aggressive e-commerce. These sites block datacenter IP ranges entirely, so standard mode will always fail. Go straight to premium and get clean data on the first try.
+- **Standard is returning thin or wrong content.** If `metadata.statusCode` is 200 but the markdown is very short, or contains phrases like "checking your browser" or "access denied", the site is blocking standard mode. Switch to premium.
+- **You need consistent results across a batch.** Some sites block standard inconsistently: some pages work, others don't. Forcing premium gives you a uniform experience across the run.
 
 ```ts
 await reader.read({
   url: "https://www.amazon.com/dp/B08N5WRWNW",
-  proxyMode: "stealth",
+  proxyMode: "premium",
 });
 ```
+
+## When to stick with `standard`
+
+Use `standard` explicitly (or leave `proxyMode` unset) when:
+
+- **You know the target is friendly.** Your own blog, a partner's public docs, a government site, a content API. No need to pay 3x.
+- **You want a cost guarantee.** With `standard` explicit, every scrape is exactly 1 credit. For a 10,000-URL batch where budget certainty matters, lock the mode.
+- **You want an error signal for blocks.** If you force `standard` and the target blocks you, Reader returns an error rather than silently costing more. You find out immediately that something changed.
 
 ## Per-site cheat sheet
 
 | Site type | Recommended mode |
 | --- | --- |
-| Blogs, marketing sites, personal sites | `auto` (or `standard` for certainty) |
-| Documentation sites (most) | `auto` |
-| News sites (most) | `auto` |
+| Blogs, marketing sites, personal sites | `standard` |
+| Documentation sites (most) | `standard` |
+| News sites (most) | `standard` |
 | Government, academic | `standard` |
 | Public APIs (JSON endpoints) | `standard` |
-| General e-commerce | `auto` |
-| Amazon product pages | `stealth` |
-| LinkedIn | `stealth` |
-| Booking / travel sites | `stealth` |
-| Social media (where accessible) | `stealth` |
-| Ticketing sites (StubHub, etc.) | `stealth` |
+| General e-commerce | `standard` (try first; switch to `premium` if blocked) |
+| Amazon product pages | `premium` |
+| LinkedIn | `premium` |
+| Booking / travel sites | `premium` |
+| Social media (where accessible) | `premium` |
+| Ticketing sites (StubHub, etc.) | `premium` |
 
-## Per-URL override in a batch
+## Per-URL split in a batch
 
-You can't set `proxyMode` per URL in a single batch; it applies to the whole batch. If you have a mixed list of friendly and hostile URLs, two options:
+`proxyMode` applies to the whole batch, not per URL. If you have a mixed list of friendly and hostile URLs, two options:
 
-1. **Pre-split the batch.** Route friendly URLs to a `standard` batch and hostile URLs to a `stealth` batch.
-2. **Run the whole batch through `auto`.** Pay the escalation cost for the hostile URLs and move on. If the friendly URLs are the majority, the average cost stays low.
+1. **Pre-split the batch.** Route friendly URLs to a `standard` batch and hostile URLs to a `premium` batch.
+2. **Run all hostile URLs at `premium`.** If you know certain domains always need premium, use a lookup to route them to a separate call.
 
-Option 2 is usually easier and the cost difference is small if most of your batch is friendly.
+Option 1 keeps costs predictable. For small mixed batches, running everything at `premium` is simpler if cost is less of a concern.
 
-## Measuring what `auto` is actually doing
+## Checking what mode was used
 
-After a run, check the `metadata.proxyMode` on every result to see the distribution:
+Every response includes `metadata.proxyMode` so you can see exactly what ran:
 
 ```ts
-const escalated = result.data.results.filter((r) => r.proxyMode === "stealth").length;
-const total = result.data.results.length;
-console.log(`Escalation rate: ${((escalated / total) * 100).toFixed(0)}%`);
+const result = await reader.read({ url });
+if (result.kind === "scrape") {
+  console.log(result.data.metadata.proxyMode); // "standard" or "premium"
+}
 ```
 
-- **Under 10%:** `auto` is working well; leave it.
-- **10%–50%:** normal for mixed sites; leave it.
-- **Over 80%:** you're wasting standard attempts; switch to explicit `stealth`.
+For a batch, check the distribution across results to understand which sites needed premium:
+
+```ts
+const premiumCount = result.data.results.filter((r) => r.proxyMode === "premium").length;
+const total = result.data.results.length;
+console.log(`Premium rate: ${((premiumCount / total) * 100).toFixed(0)}%`);
+```
 
 ## Next
 

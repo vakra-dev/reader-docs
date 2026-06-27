@@ -1,25 +1,25 @@
 ---
 title: "Auth walls and hostile sites"
-description: "When to force stealth, what Reader can't do, and how to spot a site that won't work."
+description: "When to use premium mode, what Reader can't do, and how to spot a site that won't work."
 ---
 
 Some pages won't load for any non-human request no matter what you do. Others work fine but require the right mode. This guide is about telling them apart and picking the right strategy.
 
 ## What Reader can handle
 
-`stealth` mode (or `auto` with escalation) gets you past:
+`premium` mode gets you past:
 
 - **Bot-detection walls.** Cloudflare's "Checking your browser", Akamai, PerimeterX, Datadome, similar.
 - **Rate-limited "come back later" pages** that serve bot-looking clients a different response than humans.
 - **TLS fingerprinting** that tries to distinguish automated clients from browsers.
 - **Most JavaScript challenges** where the page runs a small script before letting you in.
 
-For these, set `proxyMode: "stealth"` explicitly (or let `auto` handle it) and you'll usually get clean content:
+For these, set `proxyMode: "premium"` and you'll usually get clean content:
 
 ```ts
 await reader.read({
   url: "https://shop.example.com/item/42",
-  proxyMode: "stealth", // 3 credits/page, bypasses bot walls
+  proxyMode: "premium", // 3 credits/page, bypasses bot walls
 });
 ```
 
@@ -34,37 +34,37 @@ If you need content from a page that requires login, you have two options:
 
 **Content behind paywalls.** Reader respects the paywall: you get the preview, not the full article. This is both a technical limit and a deliberate one.
 
-**CAPTCHAs that require human interaction.** Reader's stealth mode handles most automated challenges but won't solve a visual CAPTCHA. If a page pops one of those, the scrape will either time out or return the challenge page as content.
+**CAPTCHAs that require human interaction.** Reader's premium mode handles most automated challenges but won't solve a visual CAPTCHA. If a page pops one of those, the scrape will either time out or return the challenge page as content.
 
 ## Spotting a hostile site early
 
 If your scrapes are failing with `upstream_unavailable`, `scrape_timeout`, or are returning very short `markdown` that doesn't match the real page:
 
 1. **Check `metadata.statusCode`.** A 403 or 429 from the target means a block.
-2. **Check `metadata.proxyMode`.** If you're on `auto` and it escalated to `stealth` but still failed, the site is hostile beyond what Reader handles.
+2. **Check `metadata.proxyMode`.** If you forced `premium` but still failed, the site is hostile beyond what Reader handles.
 3. **Open the URL in your browser.** If you see a "Checking your browser" interstitial or a CAPTCHA, Reader is seeing the same thing.
 
-## Forcing stealth from the start
+## Forcing premium from the start
 
-When you know ahead of time a target is hostile (Amazon, LinkedIn, booking.com, ticketing sites, some news aggregators), skip the optimistic `auto` attempt and go straight to stealth:
+When you know ahead of time a target is hostile (Amazon, LinkedIn, booking.com, ticketing sites, some news aggregators), use `premium` mode directly:
 
 ```ts
 await reader.read({
   url: "https://www.amazon.com/dp/B08N5WRWNW",
-  proxyMode: "stealth",
+  proxyMode: "premium",
 });
 ```
 
 Reasons to do this:
 
-- **You save the wasted `standard` attempt.** `auto` would try standard first, see a block, then retry with stealth, so you pay 1 credit for the wasted attempt plus latency.
-- **You get a cleaner error signal.** If you force stealth and it still fails, you know the site is beyond Reader's reach; you don't have to wonder if the escalation hadn't kicked in.
+- **You get clean data on the first try.** Standard mode will fail on these sites; skip it and go straight to premium.
+- **You get a cleaner error signal.** If you force premium and it still fails, you know the site is beyond Reader's reach.
 
-The cost is 3 credits per page regardless of whether the site actually needed stealth. For a known-hostile target, that's fine.
+The cost is 3 credits per page. For a known-hostile target, that's the right tradeoff.
 
 ## When nothing works
 
-If you've tried `stealth`, `waitForSelector`, and custom extraction and the page still won't load, the site is probably actively hostile to all non-browser traffic. Report the URL to our Discord and we'll take a look. Sometimes we can tune our handling for a specific site, sometimes the answer is "no, this one's out of scope."
+If you've tried `premium`, `waitForSelector`, and custom extraction and the page still won't load, the site is probably actively hostile to all non-browser traffic. Report the URL to our Discord and we'll take a look. Sometimes we can tune our handling for a specific site, sometimes the answer is "no, this one's out of scope."
 
 ## Next
 

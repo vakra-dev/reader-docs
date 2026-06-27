@@ -169,11 +169,11 @@ Or use the configured proxy pool:
 ```typescript
 const reader = new ReaderClient({
   proxyPools: {
-    datacenter: [{ url: "http://dc-proxy:8080" }],
+    standard: [{ url: "http://dc-proxy:8080" }],
   },
 });
 
-const session = await reader.browser({ proxyTier: "datacenter" });
+const session = await reader.browser({ proxyTier: "standard" });
 ```
 
 ## Notes

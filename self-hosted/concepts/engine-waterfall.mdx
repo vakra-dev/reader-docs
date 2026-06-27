@@ -1,6 +1,6 @@
 ---
 title: "Scraping Engine"
-description: "Playwright browser engine with proxy escalation for reliable scraping."
+description: "Playwright browser engine with proxy tier support for reliable scraping."
 ---
 
 Reader uses a single scraping engine: **Playwright** - a full headless Chrome browser connected via CDP. Chrome is spawned directly via `child_process.spawn` and Playwright connects over the Chrome DevTools Protocol. Every scrape runs through this engine, which handles JavaScript execution and anti-bot bypass via Chrome flags and the playwright-extra stealth plugin.
@@ -25,24 +25,14 @@ Each scrape attempt opens a fresh tab in a warm Chrome process (the browser pool
 
 The browser is bound to a specific proxy, so all traffic from that tab routes through the configured proxy IP.
 
-## Proxy escalation
+## Proxy tier selection
 
-Reader uses a two-step retry strategy per URL:
+The proxy tier used for a scrape is determined by the `proxyTier` option:
 
-```
-Attempt 1: Playwright on datacenter proxy (10s timeout)
-    ↓ any failure (timeout, empty, blocked, error)
-Attempt 2: Playwright on residential proxy (remaining time, up to 30s total)
-    ↓ any failure
-    Done - report error
-```
+- **`standard`** (datacenter proxies): fast and cheap. Works for most sites.
+- **`premium`** (residential proxies): uses real household IPs. Bypasses anti-bot systems that block datacenter IP ranges.
 
-- **Datacenter proxies** are fast and cheap. They work for most sites.
-- **Residential proxies** use real household IPs. They bypass anti-bot systems that block datacenter IP ranges.
-
-If the first attempt fails for any reason - timeout, empty content, HTTP error, or bot detection - the scraper automatically escalates to a residential proxy and tries again. If that also fails, the URL is reported as failed.
-
-The timeouts are configurable via `hardDeadlineMs` (total cap, default 30s) and `datacenterTimeoutMs` (first attempt, default 10s).
+If no `proxyTier` is set, Reader uses whichever proxy is configured as the default for the client.
 
 ## Quality check
 
@@ -58,7 +48,7 @@ Bot page detection (200 + block content) is handled separately by the scraper's 
 
 <CardGroup cols={2}>
   <Card title="Proxy Tiers" icon="arrows-rotate" href="/self-hosted/concepts/proxy-tiers">
-    How datacenter and residential proxies are managed.
+    How standard and premium proxies are managed.
   </Card>
   <Card title="Error Handling" icon="shield-halved" href="/self-hosted/concepts/error-handling">
     What happens when scraping fails.

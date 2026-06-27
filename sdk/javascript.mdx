@@ -62,8 +62,7 @@ if (result.kind === "scrape") {
   console.log(result.data.metadata.statusCode);     // 200
   console.log(result.data.metadata.duration);       // ms
   console.log(result.data.metadata.cached);         // true if served from cache
-  console.log(result.data.metadata.proxyMode);      // "standard" | "stealth"
-  console.log(result.data.metadata.proxyEscalated); // true only if auto escalated
+  console.log(result.data.metadata.proxyMode);      // "standard" | "premium"
 }
 ```
 
@@ -126,14 +125,14 @@ const result = await reader.read({
 Control how aggressively Reader bypasses bot walls with `proxyMode`:
 
 ```typescript
-// Default: auto. Starts standard, escalates to stealth on block
+// Default: standard. Fast and affordable, works for most sites
 await reader.read({ url });
 
-// Explicit: force the cheaper tier (error if blocked)
+// Explicit standard: force the cheaper tier (error if blocked)
 await reader.read({ url, proxyMode: "standard" });
 
-// Explicit: force the bypass tier (3x credits but works on hostile sites)
-await reader.read({ url, proxyMode: "stealth" });
+// Explicit premium: residential proxies, bypasses bot walls (3x credits)
+await reader.read({ url, proxyMode: "premium" });
 ```
 
 See [Proxy modes](/home/concepts/proxy-modes) for the full picture.
@@ -290,7 +289,7 @@ import type {
   JobStatus,
   JobMode,
   Page,
-  ProxyMode,       // "standard" | "stealth" | "auto"
+  ProxyMode,       // "standard" | "premium"
   Pagination,
   Credits,
   UsageEntry,

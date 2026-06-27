@@ -102,7 +102,7 @@ A failed scrape means your LLM has no content to reason about. Decide what to do
 
 - **Fail loudly.** Propagate the error to the user; better than an LLM hallucinating an answer to an empty prompt.
 - **Fall back to search.** If scrape fails, the user at least gets a "I couldn't read this, here's what I could find" response.
-- **Retry once with a different mode.** If `standard` failed, force `stealth` and try again.
+- **Retry once with a different mode.** If `standard` failed, force `premium` and try again.
 
 ```ts
 import { UpstreamUnavailableError, ScrapeTimeoutError } from "@vakra-dev/reader-js";
@@ -112,8 +112,8 @@ try {
   // ...
 } catch (err) {
   if (err instanceof UpstreamUnavailableError || err instanceof ScrapeTimeoutError) {
-    // retry with stealth
-    const result = await reader.read({ url, proxyMode: "stealth" });
+    // retry with premium
+    const result = await reader.read({ url, proxyMode: "premium" });
     // ...
   } else {
     throw err;

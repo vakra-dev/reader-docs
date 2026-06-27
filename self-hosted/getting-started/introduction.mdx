@@ -34,7 +34,7 @@ Most users should start with Reader Cloud - it handles proxies, browser manageme
 - **`ReaderClient`** - high-level API with lazy initialization, browser pool management, and proxy rotation
 - **`scrape()` and `crawl()`** - the same primitives as the Cloud API
 - **Playwright browser engine** - full headless Chrome with JavaScript execution and anti-bot bypass via stealth plugin
-- **Proxy escalation** - automatic datacenter-to-residential failover per URL
+- **Proxy tiers** - standard (datacenter) and premium (residential) proxy pools, selectable per request
 - **Browser pool** - recycled Chrome instances with health checks and graceful retirement
 - **CLI** - one-off scrapes, crawls, and a daemon mode with shared pool
 - **Pluggable config** - domain profiles, block detection, and URL rewriters are all caller-provided

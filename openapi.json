@@ -122,7 +122,6 @@
               "duration": 487,
               "cached": false,
               "proxyMode": "standard",
-              "proxyEscalated": false,
               "scrapedAt": "2026-04-04T12:00:00Z"
             }
           }
@@ -182,10 +181,6 @@
           "proxyMode": {
             "$ref": "#/components/schemas/ResolvedProxyMode"
           },
-          "proxyEscalated": {
-            "type": "boolean",
-            "description": "True if `auto` escalated from standard to stealth."
-          },
           "scrapedAt": {
             "type": "string",
             "format": "date-time"
@@ -201,9 +196,9 @@
         "type": "string",
         "enum": [
           "standard",
-          "stealth"
+          "premium"
         ],
-        "description": "The proxy mode that actually ran. Always resolves to `standard` or `stealth`, never `auto`."
+        "description": "The proxy mode that actually ran: `standard` (datacenter) or `premium` (residential). Omitted on cache hits."
       },
       "JobCreatedResponse": {
         "type": "object",
@@ -392,11 +387,10 @@
         "type": "string",
         "enum": [
           "standard",
-          "stealth",
-          "auto"
+          "premium"
         ],
-        "description": "Proxy mode for the scrape. `standard` is fast and affordable; `stealth` bypasses aggressive bot walls; `auto` picks automatically and only escalates to stealth when a block is detected. Default: `auto`.",
-        "example": "auto"
+        "description": "Proxy mode for the scrape. `standard` uses datacenter proxies (default, 1 credit); `premium` uses residential proxies for better bot bypass (3 credits).",
+        "example": "standard"
       },
       "JobResponse": {
         "type": "object",
@@ -520,9 +514,6 @@
           },
           "proxyMode": {
             "$ref": "#/components/schemas/ResolvedProxyMode"
-          },
-          "proxyEscalated": {
-            "type": "boolean"
           },
           "credits": {
             "type": "integer"
@@ -885,7 +876,6 @@
                       "duration": 487,
                       "cached": false,
                       "proxyMode": "standard",
-                      "proxyEscalated": false,
                       "scrapedAt": "2026-04-04T12:00:00Z"
                     }
                   }
@@ -905,7 +895,6 @@
                           "duration": 487,
                           "cached": false,
                           "proxyMode": "standard",
-                          "proxyEscalated": false,
                           "scrapedAt": "2026-04-04T12:00:00Z"
                         }
                       }

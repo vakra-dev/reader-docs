@@ -48,13 +48,13 @@ Some pages are hard for reasons selectors can't fix:
 
 ## Combining with proxy modes
 
-Sites that hydrate dynamically *and* detect bots are harder still. `waitForSelector` gets you past the hydration; `proxyMode: "stealth"` (or `auto` with escalation) gets you past the bot detection. They work independently, and you might need both:
+Sites that hydrate dynamically *and* detect bots are harder still. `waitForSelector` gets you past the hydration; `proxyMode: "premium"` gets you past the bot detection. They work independently, and you might need both:
 
 ```ts
 await reader.read({
   url: "https://shop.example.com/item/42",
   waitForSelector: ".product-price",
-  proxyMode: "auto", // lets Reader escalate if the site blocks standard
+  proxyMode: "premium", // residential proxies bypass bot detection
 });
 ```
 
@@ -67,7 +67,7 @@ If scrapes with `waitForSelector` consistently fail with `scrape_timeout`:
 1. **Test the selector manually.** Open the URL in your browser with devtools, wait for full load, then check whether the selector matches.
 2. **Bump `timeoutMs`.** Some sites are slow; 30 seconds may not be enough. Max is 120 seconds.
 3. **Try a more general selector.** Maybe your specific class name changed; use something broader.
-4. **Check if the page needs stealth mode.** Bot-walled pages may never fully hydrate for standard-mode traffic.
+4. **Check if the page needs premium mode.** Bot-walled pages may never fully hydrate for standard-mode traffic.
 
 ## Next
 

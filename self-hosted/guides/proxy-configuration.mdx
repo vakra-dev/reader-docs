@@ -1,6 +1,6 @@
 ---
 title: "Proxy Configuration"
-description: "Set up single proxies, rotation pools, and multi-tier escalation."
+description: "Set up single proxies, rotation pools, and multi-tier standard/premium selection."
 ---
 
 Proxies are configured on the `ReaderClient` or per-request via `scrape()` options. This guide covers the three common setups.
@@ -17,7 +17,7 @@ const reader = new ReaderClient();
 const result = await reader.scrape({
   urls: ["https://example.com"],
   proxy: {
-    type: "datacenter",
+    type: "standard",
     host: "proxy.example.com",
     port: 8080,
     username: "user",
@@ -59,18 +59,18 @@ await reader.scrape({
 
 Use `proxyRotation: "random"` when you want stochastic selection (e.g., to avoid fingerprinting patterns).
 
-## Multi-tier pools (datacenter + residential)
+## Multi-tier pools (standard + premium)
 
 For production, configure both tiers and pick per-request:
 
 ```javascript
 const reader = new ReaderClient({
   proxyPools: {
-    datacenter: [
+    standard: [
       { url: "http://user:pass@dc1.example.com:8080" },
       { url: "http://user:pass@dc2.example.com:8080" },
     ],
-    residential: [
+    premium: [
       {
         type: "residential",
         host: "residential.proxy-provider.com",
@@ -83,31 +83,18 @@ const reader = new ReaderClient({
   },
 });
 
-// Explicit datacenter (fast, cheap)
+// Explicit standard (fast, cheap)
 await reader.scrape({
   urls: ["https://news.example.com/article"],
-  proxyTier: "datacenter",
+  proxyTier: "standard",
 });
 
-// Explicit residential (slow, expensive, bypasses anti-bot)
+// Explicit premium (slow, expensive, bypasses anti-bot)
 await reader.scrape({
   urls: ["https://www.amazon.com/dp/B08N5WRWNW"],
-  proxyTier: "residential",
+  proxyTier: "premium",
 });
 ```
-
-## Auto mode with escalation
-
-The best pattern for mixed workloads: `proxyTier: "auto"`. Reader starts with datacenter and escalates to residential only if the request is blocked.
-
-```javascript
-await reader.scrape({
-  urls: unknownUrls,
-  proxyTier: "auto",
-});
-```
-
-You pay datacenter cost for 95% of URLs and residential cost only for the ones that need it.
 
 ## Inspecting which proxy was used
 
@@ -116,7 +103,7 @@ Every successful scrape result includes proxy metadata:
 ```javascript
 const result = await reader.scrape({
   urls: [...],
-  proxyTier: "auto",
+  proxyTier: "standard",
 });
 
 for (const page of result.data) {
@@ -132,7 +119,7 @@ Useful for debugging which tier handled which URL.
 
 ## Proxy providers
 
-Reader works with any HTTP/HTTPS proxy that supports basic auth. The exact URL format varies by provider - check their docs for the `host:port` and whether they expect `user-session-xxx` style parameters in the username field. Reader handles the sticky session parameter automatically for residential proxies.
+Reader works with any HTTP/HTTPS proxy that supports basic auth. The exact URL format varies by provider - check their docs for the `host:port` and whether they expect `user-session-xxx` style parameters in the username field. Reader handles the sticky session parameter automatically for premium (residential) proxies.
 
 ## Troubleshooting
 
@@ -142,14 +129,14 @@ Check your proxy credentials and that the proxy is reachable from your machine. 
 ### `PROXY_EXHAUSTED`
 All proxies in all configured tiers failed. Check provider status and whether you've hit a usage limit.
 
-### Residential is slow
-Residential proxies route through real ISPs, adding 300-800ms. This is expected - use them only when datacenter is blocked.
+### Premium is slow
+Premium (residential) proxies route through real ISPs, adding 300-800ms. This is expected - use them only when standard is blocked.
 
 ## Where to go next
 
 <CardGroup cols={2}>
   <Card title="Proxy Tiers concept" icon="arrows-rotate" href="/self-hosted/concepts/proxy-tiers">
-    The mental model for datacenter vs residential.
+    The mental model for standard vs premium.
   </Card>
   <Card title="Error Handling" icon="shield-halved" href="/self-hosted/concepts/error-handling">
     How to catch and retry proxy errors.

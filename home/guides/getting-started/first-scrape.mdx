@@ -63,7 +63,6 @@ if result.kind == "scrape":
       "duration": 487,
       "cached": false,
       "proxyMode": "standard",
-      "proxyEscalated": false,
       "scrapedAt": "2026-04-04T12:00:00Z"
     }
   }
@@ -79,13 +78,12 @@ Field-by-field:
 - `metadata.statusCode`: HTTP status the target site returned
 - `metadata.duration`: milliseconds Reader spent on the scrape
 - `metadata.cached`: `true` if this came from cache (free), `false` if it was a fresh fetch
-- `metadata.proxyMode`: which mode actually ran. See [Proxy modes](/home/concepts/proxy-modes).
-- `metadata.proxyEscalated`: `true` only when `auto` bumped from standard to stealth
+- `metadata.proxyMode`: which mode actually ran (`"standard"` or `"premium"`). See [Proxy modes](/home/concepts/proxy-modes).
 - `metadata.scrapedAt`: when the content was captured (on cache hits, this is the original capture time)
 
 ## You just spent 1 credit
 
-By default Reader used `proxyMode: "auto"`, which started in standard (1 credit) and didn't need to escalate. Your balance dropped by 1. Check it:
+By default Reader used `proxyMode: "standard"` (1 credit). Your balance dropped by 1. Check it:
 
 ```bash
 curl https://api.reader.dev/v1/usage/credits -H "x-api-key: $READER_KEY"

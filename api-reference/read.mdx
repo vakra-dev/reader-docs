@@ -15,6 +15,12 @@ See [The read primitive](/home/concepts/read-primitive) for a narrative overview
 
 Set `proxyMode` to `"standard"` (1 credit, fast, default) or `"premium"` (3 credits, residential proxies, bypasses bot walls). The response metadata tells you which mode ran. See [Proxy modes](/home/concepts/proxy-modes).
 
+## Concurrency
+
+Set `maxConcurrency` to limit how many browser slots a batch or crawl job uses. Prevents one large job from consuming all your plan's concurrent browser slots. Capped to your plan's limit.
+
+Check your current usage with [Queue status](/api-reference/account/queue-status).
+
 ## Idempotency
 
 Pass an `x-idempotency-key` header to deduplicate retried POSTs. Reader caches the original response for 24 hours and returns it verbatim on any subsequent request with the same key.

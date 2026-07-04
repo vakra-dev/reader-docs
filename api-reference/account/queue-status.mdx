@@ -1,0 +1,39 @@
+---
+title: "Queue status"
+openapi: "openapi.json GET /v1/queue/status"
+---
+
+Check how many browser slots your workspace is currently using, how many jobs are waiting, and your plan's concurrency limit.
+
+Use this to monitor your queue before submitting large batch jobs, or to build dashboards that show real-time scraping activity.
+
+```bash
+curl https://api.reader.dev/v1/queue/status \
+  -H "x-api-key: $READER_KEY"
+```
+
+## Concurrency limits
+
+Each plan has a maximum number of concurrent browser slots:
+
+| Plan | Concurrent browsers |
+| --- | --- |
+| Free | 2 |
+| Pro | 10 |
+| Business | 50 |
+| Enterprise | 200 |
+
+When all your browser slots are in use, new sync scrape requests return `429` with a `Retry-After` header. Async jobs (batch, crawl) queue and wait for a slot to open.
+
+## Per-request concurrency cap
+
+Pass `maxConcurrency` in your `/v1/read` request to limit how many browser slots a single batch or crawl job uses. This prevents one large job from consuming all your slots.
+
+```bash
+curl -X POST https://api.reader.dev/v1/read \
+  -H "x-api-key: $READER_KEY" \
+  -d '{
+    "urls": ["url1", "url2", "...100 more..."],
+    "maxConcurrency": 5
+  }'
+```

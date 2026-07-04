@@ -342,6 +342,11 @@
             "minimum": 1,
             "maximum": 20
           },
+          "maxConcurrency": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Max concurrent browser slots for this request. Capped to your plan's limit."
+          },
           "maxDepth": {
             "type": "integer",
             "minimum": 1,
@@ -2188,6 +2193,57 @@
                     "success",
                     "data"
                   ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/queue/status": {
+      "get": {
+        "summary": "Get queue status",
+        "description": "Returns the workspace's concurrency state: active browser slots in use, waiting jobs, and the plan's max concurrency.",
+        "tags": [
+          "Account"
+        ],
+        "security": [
+          {
+            "ApiKeyAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Queue status",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "enum": [true]
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "activeJobs": {
+                          "type": "integer",
+                          "description": "Number of browser slots currently in use"
+                        },
+                        "waitingJobs": {
+                          "type": "integer",
+                          "description": "Number of jobs waiting in the queue"
+                        },
+                        "maxConcurrency": {
+                          "type": "integer",
+                          "description": "Maximum concurrent browser slots for your plan"
+                        }
+                      },
+                      "required": ["activeJobs", "waitingJobs", "maxConcurrency"]
+                    }
+                  },
+                  "required": ["success", "data"]
                 }
               }
             }

@@ -195,7 +195,8 @@
       "group": "Account",
       "pages": [
         "api-reference/account/credits",
-        "api-reference/account/history"
+        "api-reference/account/history",
+        "api-reference/account/queue-status"
       ]
     },
     {

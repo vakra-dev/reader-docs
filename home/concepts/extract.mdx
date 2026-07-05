@@ -1,0 +1,151 @@
+---
+title: "Extract"
+description: "Pull structured data from any web page using an LLM"
+---
+
+Extract lets you pull structured data from a web page in a single API call. You provide a URL and a schema (or a natural language prompt), and Reader scrapes the page, converts it to clean markdown, sends it to an LLM, and returns validated structured JSON alongside the usual markdown output.
+
+## How it works
+
+Extract is an optional parameter on `POST /v1/read`. The scrape pipeline runs as usual, then the extracted markdown is sent to an LLM with your schema for structured extraction.
+
+```
+URL --> Scrape --> Markdown --> LLM + Schema --> Structured JSON
+```
+
+The `extracted` field appears in the response alongside `markdown`, `html`, and other standard fields. If extraction fails, the scrape result is still returned with an error in `metadata.extraction.extractionError`.
+
+## Schema formats
+
+### JSON Schema (full)
+
+Standard JSON Schema with types, descriptions, and nested objects:
+
+```json
+{
+  "extract": {
+    "schema": {
+      "type": "object",
+      "properties": {
+        "title": { "type": "string", "description": "The product name" },
+        "price": { "type": "number", "description": "Price without currency symbol" },
+        "in_stock": { "type": "boolean" }
+      }
+    }
+  }
+}
+```
+
+### Shorthand
+
+A simpler format where keys map directly to type names:
+
+```json
+{
+  "extract": {
+    "schema": {
+      "title": "string",
+      "price": "number",
+      "in_stock": "boolean"
+    }
+  }
+}
+```
+
+Shorthand is automatically expanded to full JSON Schema internally. Supported types: `string`, `number`, `integer`, `boolean`, `array`, `object`.
+
+### Prompt-only
+
+No schema, just a natural language instruction. Returns freeform JSON:
+
+```json
+{
+  "extract": {
+    "prompt": "List the 3 main topics discussed on this page"
+  }
+}
+```
+
+### Prompt + Schema
+
+Combine both for maximum control. The prompt guides the LLM while the schema enforces structure:
+
+```json
+{
+  "extract": {
+    "schema": { "title": "string", "price": "number" },
+    "prompt": "Focus on the primary product, ignore accessories"
+  }
+}
+```
+
+## Response shape
+
+```json
+{
+  "success": true,
+  "data": {
+    "url": "https://example.com/product",
+    "markdown": "# Widget Pro\n\nPrice: $49.99...",
+    "extracted": {
+      "title": "Widget Pro",
+      "price": 49.99,
+      "in_stock": true
+    },
+    "metadata": {
+      "statusCode": 200,
+      "duration": 2345,
+      "scrapedAt": "2026-07-05T12:00:00.000Z"
+    }
+  }
+}
+```
+
+## Null handling
+
+If a field in your schema does not exist on the page, Reader returns `null` for that field. It will never hallucinate values that are not present in the content.
+
+```json
+{
+  "extracted": {
+    "title": "Widget Pro",
+    "price": 49.99,
+    "ceo_name": null,
+    "ipo_date": null
+  }
+}
+```
+
+## Credits
+
+Extract adds 2 credits on top of the scrape cost:
+
+| Operation | Credits |
+|-----------|---------|
+| Standard scrape | 1 |
+| Standard scrape + extract | 3 |
+| Premium scrape + extract | 5 |
+
+If the scrape succeeds but extraction fails, the full cost (scrape + extract) is still charged because the LLM call was attempted.
+
+## Limitations
+
+- **Scrape mode only.** Extract is not supported for batch or crawl operations.
+- **Token limit.** Page content is capped at 30,000 tokens before being sent to the LLM. Long pages are intelligently truncated (70% from the beginning, 30% from the end).
+- **No caching.** Extraction always runs fresh, even if the scrape result is cached. Cached scrape responses do not include `extracted`.
+- **Validation retry.** If the LLM output does not match your schema, Reader retries once with additional context about the validation error.
+
+## Error handling
+
+Extract never fails the entire request. If the LLM call fails (timeout, rate limit, invalid response), the scrape result is still returned with `extracted: null` and an error in `metadata.extraction.extractionError`:
+
+```json
+{
+  "extracted": null,
+  "metadata": {
+    "extraction": {
+      "extractionError": "Extraction service rate limited, try again later"
+    }
+  }
+}
+```

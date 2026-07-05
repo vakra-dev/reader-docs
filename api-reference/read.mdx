@@ -21,6 +21,24 @@ Set `maxConcurrency` to limit how many browser slots a batch or crawl job uses. 
 
 Check your current usage with [Queue status](/api-reference/account/queue-status).
 
+## Extract
+
+Add the `extract` parameter to pull structured data from the page alongside markdown. Provide a JSON Schema, a shorthand schema, a natural language prompt, or both.
+
+```bash
+curl -X POST https://api.reader.dev/v1/read \
+  -H "x-api-key: $READER_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "url": "https://example.com/product",
+    "extract": {
+      "schema": { "title": "string", "price": "number", "in_stock": "boolean" }
+    }
+  }'
+```
+
+The response includes an `extracted` field with the structured data and extraction metadata. Adds 2 credits to the scrape cost. Only supported for single-URL scrapes (not batch or crawl). See [Extract](/home/concepts/extract) for details.
+
 ## Idempotency
 
 Pass an `x-idempotency-key` header to deduplicate retried POSTs. Reader caches the original response for 24 hours and returns it verbatim on any subsequent request with the same key.

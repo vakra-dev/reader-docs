@@ -1,0 +1,213 @@
+---
+title: "Structured Extraction"
+description: "Extract structured data from any web page with schemas or prompts"
+---
+
+This guide shows how to use the `extract` parameter on `POST /v1/read` to pull structured data from web pages.
+
+## Product data
+
+Extract product information from an e-commerce page:
+
+<CodeGroup>
+
+```bash cURL
+curl -X POST https://api.reader.dev/v1/read \
+  -H "x-api-key: rdr_YOUR_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "url": "https://example.com/product/widget-pro",
+    "extract": {
+      "schema": {
+        "name": "string",
+        "price": "number",
+        "currency": "string",
+        "in_stock": "boolean",
+        "description": "string"
+      }
+    }
+  }'
+```
+
+```javascript JavaScript
+import { ReaderClient } from "@vakra-dev/reader-js";
+
+const client = new ReaderClient({ apiKey: "rdr_YOUR_KEY" });
+
+const result = await client.read({
+  url: "https://example.com/product/widget-pro",
+  extract: {
+    schema: {
+      name: "string",
+      price: "number",
+      currency: "string",
+      in_stock: "boolean",
+    },
+  },
+});
+
+if (result.kind === "scrape") {
+  console.log(result.data.extracted);
+  // { name: "Widget Pro", price: 49.99, currency: "USD", in_stock: true }
+}
+```
+
+```python Python
+from reader_py import ReaderClient
+
+client = ReaderClient(api_key="rdr_YOUR_KEY")
+
+result = client.read(
+    url="https://example.com/product/widget-pro",
+    extract={"schema": {"name": "string", "price": "number"}},
+)
+
+if result.kind == "scrape":
+    print(result.data.extracted)
+```
+
+</CodeGroup>
+
+## Table data
+
+Extract structured data from HTML tables (e.g., a pricing page):
+
+```json
+{
+  "url": "https://example.com/pricing",
+  "extract": {
+    "schema": {
+      "type": "object",
+      "properties": {
+        "plans": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": { "type": "string" },
+              "price_monthly": { "type": "number" },
+              "features": { "type": "array", "items": { "type": "string" } }
+            }
+          }
+        }
+      }
+    }
+  }
+}
+```
+
+## Using field descriptions
+
+Add `description` to schema fields to guide the LLM on what to extract:
+
+```json
+{
+  "url": "https://example.com/article",
+  "extract": {
+    "schema": {
+      "type": "object",
+      "properties": {
+        "title": {
+          "type": "string",
+          "description": "The main article headline"
+        },
+        "author": {
+          "type": "string",
+          "description": "The author's full name"
+        },
+        "published_date": {
+          "type": "string",
+          "description": "Publication date in YYYY-MM-DD format"
+        },
+        "summary": {
+          "type": "string",
+          "description": "A one-sentence summary of the article"
+        }
+      }
+    }
+  }
+}
+```
+
+## Prompt-only mode
+
+When you do not need a fixed schema, use a natural language prompt:
+
+```json
+{
+  "url": "https://example.com/about",
+  "extract": {
+    "prompt": "Extract the company name, founding year, and number of employees"
+  }
+}
+```
+
+The response will be freeform JSON based on what the LLM finds on the page.
+
+## Combining prompt and schema
+
+Use both together -- the prompt provides context while the schema enforces structure:
+
+```json
+{
+  "url": "https://example.com/product",
+  "extract": {
+    "schema": { "name": "string", "price": "number" },
+    "prompt": "Focus on the main product listing, ignore recommended products in the sidebar"
+  }
+}
+```
+
+## Handling missing fields
+
+If a field in your schema does not exist on the page, it comes back as `null`. This is intentional -- Reader will never hallucinate values:
+
+```json
+{
+  "extracted": {
+    "title": "Widget Pro",
+    "price": 49.99,
+    "warranty_years": null
+  }
+}
+```
+
+## CLI usage
+
+```bash
+# With schema
+reader scrape https://example.com/product \
+  --extract-schema '{"title": "string", "price": "number"}'
+
+# With prompt
+reader scrape https://example.com/about \
+  --extract-prompt "Extract the company name and founding year"
+
+# Both
+reader scrape https://example.com/product \
+  --extract-schema '{"name": "string", "price": "number"}' \
+  --extract-prompt "Focus on the primary product"
+```
+
+## Error handling
+
+Extract never breaks the scrape response. If the LLM fails, you still get the markdown:
+
+```javascript
+const result = await client.read({
+  url: "https://example.com",
+  extract: { schema: { title: "string" } },
+});
+
+if (result.kind === "scrape") {
+  // Markdown is always available
+  console.log(result.data.markdown);
+
+  // Check if extraction succeeded
+  if (result.data.extracted) {
+    console.log("Extracted:", result.data.extracted);
+  } else {
+    console.log("Extraction failed:", result.data.metadata.extraction?.extractionError);
+  }
+}
+```

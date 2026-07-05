@@ -76,6 +76,7 @@
         "home/concepts/scrape-vs-crawl",
         "home/concepts/browser-sessions",
         "home/concepts/formats-and-extraction",
+        "home/concepts/extract",
         "home/concepts/proxy-modes",
         "home/concepts/caching",
         "home/concepts/credits-and-billing",
@@ -135,7 +136,8 @@
         "home/guides/llm/llm-pipeline",
         "home/guides/llm/rag",
         "home/guides/llm/agent-tool",
-        "home/guides/llm/structured-data"
+        "home/guides/llm/structured-data",
+        "home/guides/llm/structured-extraction"
       ]
     },
     {

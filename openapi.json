@@ -359,6 +359,10 @@
             "maximum": 10000,
             "description": "Maximum pages to discover during crawl."
           },
+          "scrape": {
+            "type": "boolean",
+            "description": "When false, crawl discovers URLs without scraping their content (discover mode). Only applies when maxDepth or maxPages is set. Default: true."
+          },
           "cache": {
             "type": "boolean",
             "description": "Reuse cached content within TTL. Default: true."

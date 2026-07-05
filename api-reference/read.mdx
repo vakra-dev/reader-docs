@@ -1,13 +1,14 @@
 ---
-title: "Scrape, batch, or crawl"
+title: "Scrape, batch, crawl, or discover"
 openapi: "openapi.json POST /v1/read"
 ---
 
 `POST /v1/read` is the unified content-extraction endpoint. It auto-detects the operation from the body:
 
-- **Single `url`** → synchronous scrape, returned immediately in the response
-- **Multiple `urls`** → async batch job
-- **`url` + `maxDepth` or `maxPages`** → async crawl job
+- **Single `url`** - synchronous scrape, returned immediately in the response
+- **Multiple `urls`** - async batch job
+- **`url` + `maxDepth` or `maxPages`** - async crawl job (discover + scrape)
+- **`url` + `maxDepth` or `maxPages` + `scrape: false`** - async discover job (URLs only, no content)
 
 See [The read primitive](/home/concepts/read-primitive) for a narrative overview.
 
@@ -50,3 +51,21 @@ curl -X POST https://api.reader.dev/v1/read \
   -H "Content-Type: application/json" \
   -d '{ "urls": ["https://example.com/a", "https://example.com/b"] }'
 ```
+
+## Discover mode
+
+Set `scrape` to `false` on a crawl request to discover URLs without extracting content. Results contain URL, title, and description only. Costs 1 credit per discover job regardless of how many URLs are found.
+
+```bash
+curl -X POST https://api.reader.dev/v1/read \
+  -H "x-api-key: $READER_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "url": "https://docs.example.com",
+    "maxDepth": 3,
+    "maxPages": 500,
+    "scrape": false
+  }'
+```
+
+See [Scrape, crawl, and discover](/home/concepts/scrape-vs-crawl) for usage patterns.

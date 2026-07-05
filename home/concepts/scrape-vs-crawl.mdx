@@ -1,14 +1,15 @@
 ---
-title: "Scrape vs crawl"
-description: "Scrape fetches URLs you already know. Crawl discovers URLs by following links. Both return the same page shape."
+title: "Scrape, crawl, and discover"
+description: "Scrape fetches URLs you already know. Crawl discovers and scrapes. Discover finds URLs without scraping. All from the same endpoint."
 ---
 
-Reader distinguishes two operations by what you know going in:
+Reader has three operations, each suited to different workflows:
 
 - **Scrape**: you already have the URLs. Reader fetches them and returns content.
 - **Crawl**: you have one starting URL and want Reader to discover and fetch the rest by following links.
+- **Discover**: like crawl, but only returns the URLs it finds without scraping their content. Fast and cheap.
 
-You trigger each from the same endpoint (`POST /v1/read`) by changing the body. The page-level output shape is identical.
+You trigger each from the same endpoint (`POST /v1/read`) by changing the body.
 
 ## Scrape
 
@@ -68,6 +69,57 @@ Use crawl when:
 | `maxPages` | 20 | 10000 |
 
 Crawls stay strictly on the same hostname as the seed URL. Links to subdomains or other hosts are ignored (e.g., crawling `docs.stripe.com` will not follow links to `dashboard.stripe.com`).
+
+## Discover
+
+Add `"scrape": false` to a crawl request. Reader follows links the same way, but skips content extraction. Each discovered URL comes back with its title and description only.
+
+```bash
+curl -X POST https://api.reader.dev/v1/read \
+  -H "x-api-key: $READER_KEY" \
+  -d '{
+    "url": "https://docs.example.com",
+    "maxDepth": 3,
+    "maxPages": 500,
+    "scrape": false
+  }'
+```
+
+Discover returns an async job. Each result in the job contains:
+
+- `url` - the discovered page URL
+- `metadata.title` - the page title
+- `metadata.description` - the page meta description
+
+No `markdown`, `html`, or `screenshot` fields are returned.
+
+**Pricing:** 1 credit per discover job, regardless of how many URLs are found.
+
+Use discover when:
+
+- You want to map a site before deciding which pages to scrape
+- You need a URL inventory for a large site
+- You want to find specific pages by title or description, then scrape only those
+
+A common pattern is discover first, then batch-scrape the URLs you care about:
+
+```ts
+// Step 1: discover all URLs
+const discovery = await reader.read({
+  url: "https://docs.example.com",
+  maxDepth: 3,
+  maxPages: 500,
+  scrape: false,
+});
+
+// Step 2: filter to the pages you want
+const blogUrls = discovery.data.results
+  .filter((r) => r.url.includes("/blog/"))
+  .map((r) => r.url);
+
+// Step 3: batch-scrape only those
+const content = await reader.read({ urls: blogUrls });
+```
 
 ## When to batch-scrape instead of crawl
 

@@ -133,6 +133,7 @@
     {
       "group": "LLM & AI Use Cases",
       "pages": [
+        "home/guides/llm/mcp-server",
         "home/guides/llm/llm-pipeline",
         "home/guides/llm/rag",
         "home/guides/llm/agent-tool",

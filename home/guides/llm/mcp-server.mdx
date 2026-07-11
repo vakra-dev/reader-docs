@@ -1,0 +1,195 @@
+---
+title: "MCP server"
+description: "Give AI coding tools the ability to read the web with the Reader MCP server."
+---
+
+The Reader MCP server lets AI coding tools scrape, crawl, extract, and discover web content directly. Install it once and your AI assistant can read any URL, crawl entire sites, or extract structured data on demand.
+
+Published as `@vakra-dev/reader-mcp` on npm. Works with any tool that supports the [Model Context Protocol](https://modelcontextprotocol.io).
+
+## Setup
+
+You need a Reader API key. Get one at [console.reader.dev](https://console.reader.dev).
+
+### Claude Code
+
+```bash
+claude mcp add reader -- npx -y @vakra-dev/reader-mcp
+```
+
+Then set your API key:
+
+```bash
+export READER_API_KEY=rdr_your_key_here
+```
+
+### Claude Desktop
+
+Add to your `claude_desktop_config.json`:
+
+```json
+{
+  "mcpServers": {
+    "reader": {
+      "command": "npx",
+      "args": ["-y", "@vakra-dev/reader-mcp"],
+      "env": {
+        "READER_API_KEY": "rdr_your_key_here"
+      }
+    }
+  }
+}
+```
+
+### Cursor
+
+Add to your Cursor MCP settings (Settings > Features > MCP Servers):
+
+```json
+{
+  "mcpServers": {
+    "reader": {
+      "command": "npx",
+      "args": ["-y", "@vakra-dev/reader-mcp"],
+      "env": {
+        "READER_API_KEY": "rdr_your_key_here"
+      }
+    }
+  }
+}
+```
+
+### VS Code
+
+Add to your `.vscode/mcp.json` or user settings:
+
+```json
+{
+  "mcpServers": {
+    "reader": {
+      "command": "npx",
+      "args": ["-y", "@vakra-dev/reader-mcp"],
+      "env": {
+        "READER_API_KEY": "rdr_your_key_here"
+      }
+    }
+  }
+}
+```
+
+### Windsurf
+
+Add to your `~/.codeium/windsurf/mcp_config.json`:
+
+```json
+{
+  "mcpServers": {
+    "reader": {
+      "command": "npx",
+      "args": ["-y", "@vakra-dev/reader-mcp"],
+      "env": {
+        "READER_API_KEY": "rdr_your_key_here"
+      }
+    }
+  }
+}
+```
+
+### Codex
+
+Add to your `~/.codex/config.toml`:
+
+```toml
+[mcp_servers.reader]
+command = "npx"
+args = ["-y", "@vakra-dev/reader-mcp"]
+
+[mcp_servers.reader.env]
+READER_API_KEY = "rdr_your_key_here"
+```
+
+### OpenCode
+
+Add to your `opencode.jsonc`:
+
+```jsonc
+{
+  "$schema": "https://opencode.ai/config.json",
+  "mcp": {
+    "reader": {
+      "type": "local",
+      "command": ["npx", "-y", "@vakra-dev/reader-mcp"],
+      "enabled": true,
+      "environment": {
+        "READER_API_KEY": "rdr_your_key_here"
+      }
+    }
+  }
+}
+```
+
+## Available tools
+
+Once connected, your AI assistant has access to these tools:
+
+| Tool | Description |
+|------|-------------|
+| `reader_scrape` | Scrape a URL and return its content as markdown, HTML, or screenshot |
+| `reader_batch_scrape` | Scrape multiple URLs in parallel |
+| `reader_crawl` | Crawl a website, discovering and scraping all linked pages |
+| `reader_discover` | Discover all URLs on a website without scraping content (fast, 1 credit flat) |
+| `reader_extract` | Scrape a URL and extract structured data using AI (schema or natural language prompt) |
+| `reader_job_status` | Check the status and results of an async job |
+| `reader_cancel_job` | Cancel a running async job |
+| `reader_session_create` | Create a browser session with a CDP WebSocket endpoint |
+| `reader_credits` | Check your credit balance and usage |
+
+## Example prompts
+
+Once the MCP server is connected, you can ask your AI assistant things like:
+
+- "Scrape https://example.com/docs and summarize the key points"
+- "Crawl https://docs.example.com up to depth 3 and find all pages about authentication"
+- "Discover all URLs on https://example.com and list the ones about pricing"
+- "Extract the product name, price, and features from https://example.com/product"
+- "Check my Reader credit balance"
+
+The AI assistant will automatically call the appropriate Reader tool and return the results.
+
+## Self-hosted
+
+If you're running a self-hosted Reader instance, set the `READER_API_URL` environment variable alongside your API key:
+
+```json
+{
+  "mcpServers": {
+    "reader": {
+      "command": "npx",
+      "args": ["-y", "@vakra-dev/reader-mcp"],
+      "env": {
+        "READER_API_KEY": "rdr_your_key_here",
+        "READER_API_URL": "https://your-reader-instance.com"
+      }
+    }
+  }
+}
+```
+
+## Pricing
+
+MCP tools use the same credit system as the API:
+
+| Operation | Credits |
+|-----------|---------|
+| Scrape (standard) | 1 per page |
+| Scrape (premium) | 3 per page |
+| Extract | +2 per page (on top of scrape) |
+| Crawl | 1 per page |
+| Discover | 1 per job (flat) |
+| Browser session | 1 per minute |
+
+## Next
+
+- [Reader as an agent tool](/home/guides/llm/agent-tool): Build your own tool calling integration
+- [Structured extraction](/home/guides/llm/structured-extraction): Extract structured data from pages
+- [RAG pipeline](/home/guides/llm/rag): Build retrieval-augmented generation with Reader

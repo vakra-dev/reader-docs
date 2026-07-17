@@ -1,11 +1,11 @@
 ---
 title: "Introduction"
-description: "The web infrastructure platform for AI. Scrape, crawl, and automate the web from a single API."
+description: "The web infrastructure platform for AI. Scrape, crawl, extract, and automate the web from a single API."
 ---
 
-Reader is the web infrastructure platform for AI. Scrape, crawl, and automate the web from a single API. Get back clean markdown, HTML, and metadata, or spin up cloud browser sessions with full Playwright/Puppeteer control.
+Reader is the web infrastructure platform for AI. Scrape, crawl, extract, and automate the web from a single API. Get back clean markdown, structured JSON, HTML, and metadata, or spin up cloud browser sessions with full Playwright/Puppeteer control.
 
-One API key. Three primitives. You point it at a URL, we handle the rest:
+One API key. Four primitives. You point it at a URL, we handle the rest:
 
 - **Rendering** dynamic, JavaScript-heavy sites so you get the page the user sees
 - **Bypassing** bot walls automatically. Pick `standard` (default) or `premium` for hostile sites
@@ -51,20 +51,21 @@ One API key. Three primitives. You point it at a URL, we handle the rest:
 
 ## How Reader works
 
-Three primitives, each with its own endpoint:
+Four primitives:
 
 | Endpoint | Primitive | What it does |
 |---|---|---|
 | `POST /v1/read` with single `url` | **Read** | Scrape a page. Returns results synchronously |
 | `POST /v1/read` with `urls` array | **Batch** | Scrape many pages. Returns a `jobId` to poll or stream |
 | `POST /v1/read` with `maxDepth` / `maxPages` | **Crawl** | Discover links and scrape each page asynchronously |
+| `POST /v1/read` with `extract` | **Extract** | Pull structured JSON from a page using a schema or prompt |
 | `POST /v1/sessions` | **Browse** | Spin up a cloud browser. Connect Playwright/Puppeteer via CDP |
 
 See [The read primitive](/home/concepts/read-primitive) for the scrape/batch/crawl mental model, or [Browser sessions](/home/concepts/browser-sessions) for interactive automation.
 
 ## Why developers pick Reader
 
-- **Three primitives, one platform.** Read, crawl, and browse through one API key, one credit pool. No separate billing tracks or hidden multipliers.
+- **Four primitives, one platform.** Read, crawl, extract, and browse through one API key, one credit pool. No separate billing tracks or hidden multipliers.
 - **Browser automation included.** Full Playwright and Puppeteer compatibility via CDP. Connect your existing scripts to cloud browsers with anti-bot stealth active.
 - **Handles the modern web.** Dynamic pages render correctly, bot walls get bypassed using standard or premium proxy modes, and you never touch the underlying infrastructure.
 - **Built for LLMs.** Output is clean markdown by default, with optional HTML and metadata. Main content extraction removes boilerplate so your tokens aren't wasted.

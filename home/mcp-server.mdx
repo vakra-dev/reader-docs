@@ -14,13 +14,7 @@ You need a Reader API key. Get one at [console.reader.dev](https://console.reade
 ### Claude Code
 
 ```bash
-claude mcp add reader -- npx -y @vakra-dev/reader-mcp
-```
-
-Then set your API key:
-
-```bash
-export READER_API_KEY=rdr_your_key_here
+claude mcp add reader -e READER_API_KEY=rdr_your_key_here -- npx -y @vakra-dev/reader-mcp
 ```
 
 ### Claude Desktop
@@ -97,7 +91,11 @@ Add to your `~/.codeium/windsurf/mcp_config.json`:
 
 ### Codex
 
-Add to your `~/.codex/config.toml`:
+```bash
+codex mcp add reader --env READER_API_KEY=rdr_your_key_here -- npx -y @vakra-dev/reader-mcp
+```
+
+Or add to your `~/.codex/config.toml`:
 
 ```toml
 [mcp_servers.reader]
